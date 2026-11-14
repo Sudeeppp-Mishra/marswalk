@@ -55,6 +55,19 @@ export async function getTerrainMetadata() {
   }
 }
 
+export async function getGeologyData() {
+  try {
+    const response = await fetch(`${BASE_URL}/science/geology`);
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch geology data:', error);
+    return { geological_units: [], rover_observations: [] };
+  }
+}
+
 export function getOverlayUrl(type) {
   return `${BASE_URL}/terrain/overlay/${type}`;
 }
