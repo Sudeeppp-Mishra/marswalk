@@ -93,16 +93,27 @@ async def get_terrain_overlay(overlay_type: str):
 async def calculate_route(request: RouteRequest):
     """
     Suggested path calculation endpoint (A* Engine).
-    Will be populated in Phase 4 once the terrain cost grid is generated from authentic DEM.
+    Runs cost-aware pathfinding over authentic 20m CTX DTM & slope grid.
     """
+    max_slope = request.max_slope_deg if request.max_slope_deg is not None else 20.0
+    result = terrain_engine.calculate_route(
+        start_lat=request.start.lat,
+        start_lng=request.start.lng,
+        dest_lat=request.destination.lat,
+        dest_lng=request.destination.lng,
+        max_slope_deg=max_slope
+    )
+
     return RouteResponse(
-        status="pending_phase4",
-        route=[],
-        distance_meters=None,
-        estimated_difficulty="unknown",
-        assumptions=[
-            "Requires processed elevation grid from Phase 3",
-            "Pathfinding requires traversability cost model based on DEM slope calculations"
-        ]
+        status=result.get("status", "failed"),
+        error=result.get("error"),
+        route=result.get("route", []),
+        distance_meters=result.get("distance_meters"),
+        distance_km=result.get("distance_km"),
+        estimated_difficulty=result.get("estimated_difficulty", "unknown"),
+        elevation_gain_m=result.get("elevation_gain_m"),
+        elevation_loss_m=result.get("elevation_loss_m"),
+        max_slope_deg=result.get("max_slope_deg"),
+        assumptions=result.get("assumptions", [])
     )
 

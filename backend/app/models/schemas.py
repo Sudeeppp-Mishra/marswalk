@@ -50,8 +50,13 @@ class RouteRequest(BaseModel):
 
 class RouteResponse(BaseModel):
     status: str
-    route: List[Dict[str, float]]
+    error: Optional[str] = None
+    route: List[Dict[str, Any]]
     distance_meters: Optional[float] = None
+    distance_km: Optional[float] = None
     estimated_difficulty: str = "unknown"
+    elevation_gain_m: Optional[float] = None
+    elevation_loss_m: Optional[float] = None
+    max_slope_deg: Optional[float] = None
     assumptions: List[str] = Field(default_factory=list)
 

@@ -4,6 +4,7 @@ from pathlib import Path
 from PIL import Image
 import matplotlib.cm as cm
 from ..core.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, MARS_RADIUS_EQUATORIAL_M
+from ..algorithms.astar import AStarPlanner
 
 DTM_FILENAME = "JEZ_ctx_B_soc_008_DTM_MOLAtopography_DeltaGeoid_20m_Eqc_latTs0_lon0.tif"
 ORTHO_FILENAME = "JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0.tif"
@@ -133,6 +134,89 @@ class TerrainProcessor:
             "elevation_overlay": str(elev_out),
             "slope_overlay": str(slope_out),
             "bounds": JEZERO_BOUNDS_DEG
+        }
+
+    def calculate_route(
+        self,
+        start_lat: float,
+        start_lng: float,
+        dest_lat: float,
+        dest_lng: float,
+        max_slope_deg: float = 20.0
+    ) -> Dict[str, Any]:
+        """
+        Calculates suggested path between start and destination coordinates.
+        Returns GeoJSON-compatible coordinates sequence and terrain statistics.
+        """
+        if self._elevation is None:
+            self.load_dtm()
+
+        r = MARS_RADIUS_EQUATORIAL_M
+        inv_transform = ~self._transform
+
+        # Convert start coords to grid (row, col)
+        start_x = r * np.radians(start_lng)
+        start_y = r * np.radians(start_lat)
+        sc, sr = inv_transform * (start_x, start_y)
+        start_rc = (int(round(sr)), int(round(sc)))
+
+        # Convert dest coords to grid (row, col)
+        dest_x = r * np.radians(dest_lng)
+        dest_y = r * np.radians(dest_lat)
+        dc, dr = inv_transform * (dest_x, dest_y)
+        dest_rc = (int(round(dr)), int(round(dc)))
+
+        # Initialize A* planner
+        planner = AStarPlanner(
+            elevation_grid=self._elevation,
+            slope_grid=self._slope,
+            res_meters=self._res[0],
+            max_slope_deg=max_slope_deg
+        )
+
+        result = planner.find_path(start_rc, dest_rc)
+        if "error" in result:
+            return {
+                "status": "failed",
+                "error": result["error"],
+                "route": [],
+                "distance_meters": None,
+                "assumptions": [
+                    f"Slope threshold: {max_slope_deg}°",
+                    "Path blocked by terrain hazards or invalid coordinates"
+                ]
+            }
+
+        # Transform grid coordinates back to (lat, lng) sequence
+        path_rc = result.pop("path_rc")
+        coordinates = []
+        elevation_profile = []
+
+        for row, col in path_rc:
+            x, y = self._transform * (col, row)
+            lon = float(np.degrees(x / r))
+            lat = float(np.degrees(y / r))
+            elev = float(self._elevation[row, col])
+            slope = float(self._slope[row, col])
+
+            coordinates.append({
+                "lat": round(lat, 5),
+                "lng": round(lon, 5),
+                "elevation_m": round(elev, 1),
+                "slope_deg": round(slope, 1)
+            })
+
+        return {
+            "status": "success",
+            "route": coordinates,
+            "metrics": result,
+            "distance_meters": result["distance_meters"],
+            "distance_km": result["distance_km"],
+            "estimated_difficulty": result["estimated_difficulty"],
+            "elevation_gain_m": result["elevation_gain_m"],
+            "elevation_loss_m": result["elevation_loss_m"],
+            "max_slope_deg": result["max_slope_deg"],
+            "assumptions": result["assumptions"]
         }
 
 terrain_engine = TerrainProcessor()
