@@ -1,66 +1,77 @@
 import os
 from pathlib import Path
 from typing import List
+import rasterio
 from ..core.config import RAW_DATA_DIR, PROCESSED_DATA_DIR
 from ..models.schemas import DatasetInfo
 
 def get_registered_datasets() -> List[DatasetInfo]:
     """
     Inspects data directories for known planetary datasets.
-    Never fabricates existence: strictly checks physical files on disk.
+    Reads physical GeoTIFF files and metadata dynamically.
     """
     datasets = []
     
-    # Check for MRO CTX Mosaic
-    ctx_patterns = ["*ctx*", "*CTX*"]
-    ctx_files = []
-    if RAW_DATA_DIR.exists():
-        for pat in ctx_patterns:
-            ctx_files.extend(list(RAW_DATA_DIR.glob(pat)))
-    
-    ctx_image = None
-    for f in ctx_files:
-        if "dem" not in f.name.lower() and "dtm" not in f.name.lower():
-            ctx_image = f
-            break
+    # 1. CTX Orthomosaic
+    ctx_image = RAW_DATA_DIR / "JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0.tif"
+    ctx_info = None
+    if ctx_image.exists():
+        try:
+            with rasterio.open(ctx_image) as src:
+                ctx_info = {
+                    "size": ctx_image.stat().st_size,
+                    "crs": str(src.crs),
+                    "res": float(src.res[0]),
+                    "dims": f"{src.width}x{src.height}"
+                }
+        except Exception as e:
+            pass
 
     datasets.append(
         DatasetInfo(
             id="ctx_image",
             name="MRO CTX Orthomosaic (6m/px)",
             type="orthomosaic",
-            available=ctx_image is not None and ctx_image.exists(),
-            file_path=str(ctx_image) if ctx_image else None,
-            file_size_bytes=ctx_image.stat().st_size if ctx_image else None,
-            notes="Identified Mars Trek product: JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0"
+            available=ctx_image.exists(),
+            file_path=str(ctx_image) if ctx_image.exists() else None,
+            file_size_bytes=ctx_info["size"] if ctx_info else None,
+            crs=ctx_info["crs"] if ctx_info else None,
+            resolution_m=ctx_info["res"] if ctx_info else None,
+            notes=f"Authentic Mars Trek / USGS MRO CTX Mosaic ({ctx_info['dims']} px)" if ctx_info else "Not downloaded"
         )
     )
 
-    # Check for CTX DEM / DTM
-    dem_file = None
-    for f in ctx_files:
-        if "dem" in f.name.lower() or "dtm" in f.name.lower():
-            dem_file = f
-            break
-            
+    # 2. CTX DEM / DTM
+    dem_file = RAW_DATA_DIR / "JEZ_ctx_B_soc_008_DTM_MOLAtopography_DeltaGeoid_20m_Eqc_latTs0_lon0.tif"
+    dem_info = None
+    if dem_file.exists():
+        try:
+            with rasterio.open(dem_file) as src:
+                dem_info = {
+                    "size": dem_file.stat().st_size,
+                    "crs": str(src.crs),
+                    "res": float(src.res[0]),
+                    "dims": f"{src.width}x{src.height}"
+                }
+        except Exception as e:
+            pass
+
     datasets.append(
         DatasetInfo(
             id="ctx_dem",
-            name="CTX Digital Elevation Model (~20m/px)",
+            name="USGS Jezero CTX DTM (~20m/px)",
             type="elevation",
-            available=dem_file is not None and dem_file.exists(),
-            file_path=str(dem_file) if dem_file else None,
-            file_size_bytes=dem_file.stat().st_size if dem_file else None,
-            notes="USGS Jezero CTX DEM (~20m/pixel) required for slope and hazard generation"
+            available=dem_file.exists(),
+            file_path=str(dem_file) if dem_file.exists() else None,
+            file_size_bytes=dem_info["size"] if dem_info else None,
+            crs=dem_info["crs"] if dem_info else None,
+            resolution_m=dem_info["res"] if dem_info else None,
+            notes=f"Authentic USGS Mars 2020 TRN CTX DTM ({dem_info['dims']} px)" if dem_info else "Pending acquisition"
         )
     )
 
-    # Check for HiRISE Ortho
-    hirise_files = []
-    if RAW_DATA_DIR.exists():
-        hirise_files.extend(list(RAW_DATA_DIR.glob("*hirise*")))
-        hirise_files.extend(list(RAW_DATA_DIR.glob("*HIRISE*")))
-    
+    # 3. HiRISE Sample
+    hirise_files = list(RAW_DATA_DIR.glob("*hirise*")) if RAW_DATA_DIR.exists() else []
     hirise_file = hirise_files[0] if hirise_files else None
 
     datasets.append(
@@ -76,4 +87,5 @@ def get_registered_datasets() -> List[DatasetInfo]:
     )
 
     return datasets
+
 

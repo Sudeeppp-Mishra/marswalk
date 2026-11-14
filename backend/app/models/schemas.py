@@ -25,6 +25,24 @@ class PointCoordinates(BaseModel):
     lat: float
     lng: float
 
+class TerrainPointResponse(BaseModel):
+    valid: bool
+    lat: float
+    lng: float
+    elevation_m: Optional[float] = None
+    slope_deg: Optional[float] = None
+    risk_tier: Optional[str] = None
+    crs: str = "ESRI:103885 (Equidistant Cylindrical Mars)"
+
+class TerrainMetadataResponse(BaseModel):
+    available: bool
+    bounds: Dict[str, float]
+    resolution_m: float
+    min_elevation_m: float
+    max_elevation_m: float
+    mean_elevation_m: float
+
+
 class RouteRequest(BaseModel):
     start: PointCoordinates
     destination: PointCoordinates
