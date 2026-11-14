@@ -15,6 +15,7 @@ export default function App() {
   const [startPoint, setStartPoint] = useState(null);
   const [destinationPoint, setDestinationPoint] = useState(null);
   const [activeLayer, setActiveLayer] = useState('ctx');
+  const [routeData, setRouteData] = useState(null);
 
   useEffect(() => {
     async function init() {
@@ -63,6 +64,8 @@ export default function App() {
               onSelectPoint={handleSelectPoint}
               activeLayer={activeLayer}
               setActiveLayer={setActiveLayer}
+              routeData={routeData}
+              setRouteData={setRouteData}
             />
           )}
 
@@ -83,10 +86,10 @@ export default function App() {
                 <div className="p-4 rounded-lg bg-[#191b20] border border-[#33363D] space-y-2">
                   <h3 className="font-semibold text-sm text-[#F3F3F3]">Slope Formula Specification</h3>
                   <div className="p-3 bg-[#101114] rounded border border-[#33363D] font-mono text-xs text-[#D97745]">
-                    Slope = arctan(√((dz/dx)² + (dz/dy)²))
+                    Slope = arctan(√((dz/dx)² + (dz/dy)²)) × (180/π)
                   </div>
                   <p className="text-xs text-[#A6A8AD] leading-relaxed">
-                    Calculated using true pixel spatial resolution (meters per pixel) rather than raw grid indexing to preserve metric ground distance.
+                    Calculated using true 20.0 m/pixel ground spacing from the USGS TRN CTX DTM mosaic in ESRI:103885 Mars Equidistant Cylindrical CRS.
                   </p>
                 </div>
 
@@ -108,6 +111,24 @@ export default function App() {
                   </ul>
                 </div>
               </div>
+
+              <div className="p-4 rounded-lg bg-[#191b20] border border-[#33363D] space-y-3">
+                <h3 className="font-semibold text-sm text-[#F3F3F3]">Coverage Statistics (Authentic DTM)</h3>
+                <div className="grid grid-cols-3 gap-3 font-mono text-xs text-center">
+                  <div className="bg-[#101114] p-3 rounded border border-[#33363D]">
+                    <span className="text-[#A6A8AD] block text-[10px]">MIN ELEVATION</span>
+                    <span className="text-sky-400 font-bold text-sm">-2,710.7 m</span>
+                  </div>
+                  <div className="bg-[#101114] p-3 rounded border border-[#33363D]">
+                    <span className="text-[#A6A8AD] block text-[10px]">MEAN ELEVATION</span>
+                    <span className="text-[#F3F3F3] font-bold text-sm">-2,356.9 m</span>
+                  </div>
+                  <div className="bg-[#101114] p-3 rounded border border-[#33363D]">
+                    <span className="text-[#A6A8AD] block text-[10px]">MAX ELEVATION</span>
+                    <span className="text-[#D97745] font-bold text-sm">-1,515.5 m</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -124,33 +145,43 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="bg-[#191b20] border border-[#33363D] rounded-lg p-5 space-y-4">
-                <h3 className="text-sm font-semibold font-mono text-[#F3F3F3]">Selected Waypoints</h3>
-                <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-                  <div className="p-3 bg-[#101114] rounded border border-[#33363D]">
-                    <span className="text-[#A6A8AD]">Origin:</span>
-                    <div className="text-[#F3F3F3] mt-1 font-semibold">
-                      {startPoint ? `${startPoint.lat}° N, ${startPoint.lng}° E` : 'None (click on map in Explore tab)'}
+              {routeData ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+                    <div className="p-3 bg-[#191b20] rounded border border-[#33363D]">
+                      <span className="text-[#A6A8AD] text-[10px]">TOTAL DISTANCE</span>
+                      <div className="text-base font-bold text-sky-400 mt-1">{routeData.distance_km} km</div>
+                    </div>
+                    <div className="p-3 bg-[#191b20] rounded border border-[#33363D]">
+                      <span className="text-[#A6A8AD] text-[10px]">DIFFICULTY</span>
+                      <div className="text-base font-bold text-emerald-400 mt-1">{routeData.estimated_difficulty}</div>
+                    </div>
+                    <div className="p-3 bg-[#191b20] rounded border border-[#33363D]">
+                      <span className="text-[#A6A8AD] text-[10px]">ELEVATION GAIN</span>
+                      <div className="text-base font-bold text-[#F3F3F3] mt-1">+{routeData.elevation_gain_m} m</div>
+                    </div>
+                    <div className="p-3 bg-[#191b20] rounded border border-[#33363D]">
+                      <span className="text-[#A6A8AD] text-[10px]">MAX SLOPE</span>
+                      <div className="text-base font-bold text-[#D97745] mt-1">{routeData.max_slope_deg}°</div>
                     </div>
                   </div>
-                  <div className="p-3 bg-[#101114] rounded border border-[#33363D]">
-                    <span className="text-[#A6A8AD]">Destination:</span>
-                    <div className="text-[#F3F3F3] mt-1 font-semibold">
-                      {destinationPoint ? `${destinationPoint.lat}° N, ${destinationPoint.lng}° E` : 'None (click on map in Explore tab)'}
-                    </div>
+
+                  <div className="p-4 bg-[#191b20] rounded-lg border border-[#33363D] space-y-2">
+                    <h4 className="text-xs font-mono uppercase text-[#F3F3F3] font-semibold">Algorithm Assumptions & Disclosures</h4>
+                    <ul className="text-xs space-y-1 font-mono text-[#A6A8AD] list-disc list-inside">
+                      {routeData.assumptions.map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
-
-                <div className="p-4 bg-[#22252c] rounded border border-[#33363D] text-xs space-y-2">
-                  <div className="font-mono font-medium text-[#D97745]">A* Cost Weighting Model:</div>
-                  <div className="font-mono text-[#A6A8AD] text-[11px]">
-                    Total Cost = Distance Cost + Terrain Penalty + Hazard Penalty + Uncertainty Penalty
-                  </div>
-                  <p className="text-[11px] text-[#A6A8AD]">
-                    All paths generated are suggested trajectories based on available orbital data models.
+              ) : (
+                <div className="p-6 bg-[#191b20] border border-[#33363D] rounded-lg text-center space-y-3">
+                  <p className="text-xs text-[#A6A8AD] font-mono">
+                    No route currently computed. Go to the <strong className="text-[#F3F3F3]">Explore Mars</strong> tab, click on the map to set Origin and Destination points, and click <strong className="text-[#D97745]">Compute Suggested Route</strong>.
                   </p>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -230,6 +261,7 @@ export default function App() {
           startPoint={startPoint}
           destinationPoint={destinationPoint}
           activeLayer={activeLayer}
+          routeData={routeData}
         />
       </div>
 

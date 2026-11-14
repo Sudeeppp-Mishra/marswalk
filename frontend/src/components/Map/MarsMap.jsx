@@ -6,6 +6,7 @@ import {
   Marker, 
   Popup, 
   Rectangle,
+  Polyline,
   useMapEvents 
 } from 'react-leaflet';
 import { 
@@ -16,13 +17,15 @@ import {
   AlertCircle, 
   Compass, 
   Navigation as NavIcon,
-  Maximize2
+  Play,
+  RotateCcw,
+  Sparkles,
+  TrendingUp,
+  Mountain
 } from 'lucide-react';
 import L from 'leaflet';
-import { getOverlayUrl, getTerrainAtPoint } from '../../services/api';
+import { getOverlayUrl, getTerrainAtPoint, calculateRoute } from '../../services/api';
 
-// Bounding box of the authentic Jezero CTX mosaic & DTM
-// [south, west] to [north, east]
 const JEZERO_BOUNDS = [
   [18.2110274, 77.1604655],
   [18.7211945, 77.6991776]
@@ -30,7 +33,6 @@ const JEZERO_BOUNDS = [
 
 const JEZERO_CENTER = [18.38, 77.58];
 
-// Scientific Landmarks
 const LANDMARKS = [
   {
     name: 'Octavia E. Butler Landing',
@@ -52,7 +54,6 @@ const LANDMARKS = [
   }
 ];
 
-// Helper component for mouse tracking and click handlers
 function MapEventsHandler({ onCursorMove, onMapClick }) {
   const throttleRef = useRef(0);
 
@@ -78,13 +79,16 @@ export default function MarsMap({
   destinationPoint, 
   onSelectPoint,
   activeLayer,
-  setActiveLayer 
+  setActiveLayer,
+  routeData,
+  setRouteData
 }) {
   const [terrainSample, setTerrainSample] = useState(null);
   const [showLandmarks, setShowLandmarks] = useState(true);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calcError, setCalcError] = useState(null);
 
   const handleCursorMove = async (lat, lng) => {
-    // 1. Report coordinates immediately to parent
     onCursorChange({ 
       lat: lat.toFixed(4), 
       lng: lng.toFixed(4),
@@ -93,7 +97,6 @@ export default function MarsMap({
       risk_tier: terrainSample?.risk_tier
     });
 
-    // 2. Query point terrain from backend if within Jezero bounds
     if (
       lat >= JEZERO_BOUNDS[0][0] && lat <= JEZERO_BOUNDS[1][0] &&
       lng >= JEZERO_BOUNDS[0][1] && lng <= JEZERO_BOUNDS[1][1]
@@ -120,12 +123,49 @@ export default function MarsMap({
     } else {
       onSelectPoint('start', { lat, lng });
       onSelectPoint('destination', null);
+      setRouteData(null);
     }
   };
 
+  const handleComputeRoute = async () => {
+    if (!startPoint || !destinationPoint) return;
+    setIsCalculating(true);
+    setCalcError(null);
+
+    const res = await calculateRoute(startPoint, destinationPoint);
+    setIsCalculating(false);
+
+    if (res && res.status === 'success') {
+      setRouteData(res);
+    } else {
+      setCalcError(res?.error || 'Path blocked by terrain hazards.');
+    }
+  };
+
+  const handleResetPoints = () => {
+    onSelectPoint('start', null);
+    onSelectPoint('destination', null);
+    setRouteData(null);
+    setCalcError(null);
+  };
+
+  const handleApplyPreset = (preset) => {
+    if (preset === 'perseverance_to_kodiak') {
+      onSelectPoint('start', { lat: 18.4447, lng: 77.4508 });
+      onSelectPoint('destination', { lat: 18.4231, lng: 77.4125 });
+      setRouteData(null);
+    } else if (preset === 'delta_traverse') {
+      onSelectPoint('start', { lat: 18.4350, lng: 77.4200 });
+      onSelectPoint('destination', { lat: 18.4150, lng: 77.3850 });
+      setRouteData(null);
+    }
+  };
+
+  const polylineCoords = routeData?.route?.map(pt => [pt.lat, pt.lng]) || [];
+
   return (
     <div className="relative w-full h-full bg-[#101114] overflow-hidden flex flex-col">
-      {/* Top HUD Layer Selector */}
+      {/* Top Left Layer Selector */}
       <div className="absolute top-4 left-4 z-[1000] flex flex-wrap gap-2">
         <div className="bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg p-1.5 flex items-center space-x-1 shadow-xl">
           <button
@@ -167,43 +207,77 @@ export default function MarsMap({
                 : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
             }`}
           >
-            Global Base (Viking)
+            Global Base
           </button>
         </div>
 
-        {/* Toggle Landmarks Button */}
-        <button
-          onClick={() => setShowLandmarks(!showLandmarks)}
-          className={`px-3 py-1.5 rounded text-xs font-mono border backdrop-blur-md transition-colors ${
-            showLandmarks 
-              ? 'bg-[#22252c] text-emerald-400 border-emerald-500/40' 
-              : 'bg-[#191b20]/90 text-[#A6A8AD] border-[#33363D]'
-          }`}
-        >
-          {showLandmarks ? 'Landmarks: Visible' : 'Landmarks: Hidden'}
-        </button>
-      </div>
-
-      {/* Top Right Waypoint Indicators */}
-      <div className="absolute top-4 right-4 z-[1000] bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg px-3 py-2 text-xs font-mono shadow-xl flex items-center space-x-3">
-        <div className="flex items-center space-x-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-          <span className="text-[#A6A8AD]">START:</span>
-          <span className="text-[#F3F3F3]">
-            {startPoint ? `${startPoint.lat}°, ${startPoint.lng}°` : 'Click map to place'}
-          </span>
-        </div>
-        <div className="w-[1px] h-4 bg-[#33363D]"></div>
-        <div className="flex items-center space-x-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#D97745] inline-block animate-pulse"></span>
-          <span className="text-[#A6A8AD]">DEST:</span>
-          <span className="text-[#F3F3F3]">
-            {destinationPoint ? `${destinationPoint.lat}°, ${destinationPoint.lng}°` : 'Click map to place'}
-          </span>
+        {/* Preset Mission Selector */}
+        <div className="bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg p-1.5 flex items-center space-x-1 shadow-xl">
+          <button
+            onClick={() => handleApplyPreset('perseverance_to_kodiak')}
+            className="px-2.5 py-1.5 rounded text-[11px] font-mono text-[#A6A8AD] hover:text-[#D97745] hover:bg-[#22252c] transition-colors"
+          >
+            Preset: Landing → Kodiak
+          </button>
+          <button
+            onClick={() => handleApplyPreset('delta_traverse')}
+            className="px-2.5 py-1.5 rounded text-[11px] font-mono text-[#A6A8AD] hover:text-[#D97745] hover:bg-[#22252c] transition-colors"
+          >
+            Preset: Delta Traverse
+          </button>
         </div>
       </div>
 
-      {/* Main Map Container */}
+      {/* Top Right Waypoint Controls & Compute Button */}
+      <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end space-y-2">
+        <div className="bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg px-3 py-2 text-xs font-mono shadow-xl flex items-center space-x-3">
+          <div className="flex items-center space-x-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            <span className="text-[#A6A8AD]">START:</span>
+            <span className="text-[#F3F3F3]">
+              {startPoint ? `${startPoint.lat}°, ${startPoint.lng}°` : 'Click map to place'}
+            </span>
+          </div>
+          <div className="w-[1px] h-4 bg-[#33363D]"></div>
+          <div className="flex items-center space-x-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#D97745] inline-block animate-pulse"></span>
+            <span className="text-[#A6A8AD]">DEST:</span>
+            <span className="text-[#F3F3F3]">
+              {destinationPoint ? `${destinationPoint.lat}°, ${destinationPoint.lng}°` : 'Click map to place'}
+            </span>
+          </div>
+
+          {(startPoint || destinationPoint) && (
+            <button
+              onClick={handleResetPoints}
+              title="Reset Waypoints"
+              className="p-1 rounded hover:bg-[#22252c] text-[#A6A8AD] hover:text-rose-400 transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Compute Route Trigger */}
+        {startPoint && destinationPoint && !routeData && (
+          <button
+            onClick={handleComputeRoute}
+            disabled={isCalculating}
+            className="bg-[#D97745] hover:bg-[#B85C38] text-white px-4 py-2 rounded-lg font-mono text-xs font-semibold shadow-2xl flex items-center space-x-2 transition-all transform hover:scale-105 active:scale-95"
+          >
+            <Play className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : ''}`} />
+            <span>{isCalculating ? 'COMPUTING A* TRAJECTORY...' : 'COMPUTE SUGGESTED ROUTE'}</span>
+          </button>
+        )}
+
+        {calcError && (
+          <div className="bg-rose-950/90 border border-rose-500/50 text-rose-200 text-xs font-mono px-3 py-1.5 rounded-lg max-w-sm">
+            {calcError}
+          </div>
+        )}
+      </div>
+
+      {/* Main Leaflet Map Container */}
       <MapContainer
         center={JEZERO_CENTER}
         zoom={11}
@@ -225,7 +299,7 @@ export default function MarsMap({
           maxZoom={15}
         />
 
-        {/* Authentic Layer 1: MRO CTX Mosaic (6m/pixel) from JPL Mars Trek */}
+        {/* CTX 6m Orthomosaic */}
         {(activeLayer === 'ctx' || activeLayer === 'elevation' || activeLayer === 'slope') && (
           <TileLayer
             attribution='&copy; NASA/JPL/MSSS MRO Context Camera (CTX)'
@@ -238,7 +312,7 @@ export default function MarsMap({
           />
         )}
 
-        {/* Authentic Layer 2: 20m CTX DTM Elevation Color Overlay */}
+        {/* 20m CTX DTM Elevation Overlay */}
         {activeLayer === 'elevation' && (
           <ImageOverlay
             url={getOverlayUrl('elevation')}
@@ -247,7 +321,7 @@ export default function MarsMap({
           />
         )}
 
-        {/* Authentic Layer 3: Derived Slope Hazard Map */}
+        {/* Derived Slope Hazard Map */}
         {activeLayer === 'slope' && (
           <ImageOverlay
             url={getOverlayUrl('slope')}
@@ -256,7 +330,7 @@ export default function MarsMap({
           />
         )}
 
-        {/* Jezero Delta Bounding Box Border */}
+        {/* Jezero Delta Bounding Box */}
         <Rectangle
           bounds={JEZERO_BOUNDS}
           pathOptions={{
@@ -266,6 +340,31 @@ export default function MarsMap({
             dashArray: '4, 4'
           }}
         />
+
+        {/* Computed A* Trajectory Path */}
+        {polylineCoords.length > 0 && (
+          <>
+            {/* Glow Underlay */}
+            <Polyline
+              positions={polylineCoords}
+              pathOptions={{
+                color: '#D97745',
+                weight: 6,
+                opacity: 0.4
+              }}
+            />
+            {/* Core Trajectory */}
+            <Polyline
+              positions={polylineCoords}
+              pathOptions={{
+                color: '#38BDF8',
+                weight: 3,
+                opacity: 0.95,
+                dashArray: '6, 6'
+              }}
+            />
+          </>
+        )}
 
         {/* Scientific Landmarks */}
         {showLandmarks && LANDMARKS.map((item, idx) => (
@@ -288,7 +387,7 @@ export default function MarsMap({
           <Marker position={[startPoint.lat, startPoint.lng]}>
             <Popup>
               <div className="p-1 font-mono text-xs">
-                <p className="font-bold text-emerald-400">START WAYPOINT</p>
+                <p className="font-bold text-emerald-400">ORIGIN WAYPOINT</p>
                 <p>Lat: {startPoint.lat}° N</p>
                 <p>Lon: {startPoint.lng}° E</p>
               </div>
@@ -309,6 +408,60 @@ export default function MarsMap({
           </Marker>
         )}
       </MapContainer>
+
+      {/* Floating Route Telemetry Card (When Route is Active) */}
+      {routeData && (
+        <div className="absolute bottom-4 right-4 z-[1000] bg-[#191b20]/95 border border-[#33363D] text-xs font-mono rounded-lg p-4 max-w-sm backdrop-blur shadow-2xl space-y-3">
+          <div className="flex items-center justify-between border-b border-[#33363D] pb-2">
+            <div className="flex items-center space-x-1.5 text-sky-400 font-semibold">
+              <NavIcon className="w-4 h-4" />
+              <span>SUGGESTED TRAJECTORY</span>
+            </div>
+            <button
+              onClick={handleResetPoints}
+              className="text-[10px] text-[#A6A8AD] hover:text-rose-400 transition-colors"
+            >
+              Clear Route
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="bg-[#22252c] p-2 rounded border border-[#33363D]">
+              <span className="text-[#A6A8AD]">Distance:</span>
+              <div className="text-[#F3F3F3] font-bold text-sm mt-0.5">
+                {routeData.distance_km} km
+              </div>
+              <span className="text-[9px] text-[#A6A8AD]">({routeData.distance_meters?.toLocaleString()} m)</span>
+            </div>
+
+            <div className="bg-[#22252c] p-2 rounded border border-[#33363D]">
+              <span className="text-[#A6A8AD]">Difficulty:</span>
+              <div className="text-emerald-400 font-bold text-sm mt-0.5">
+                {routeData.estimated_difficulty}
+              </div>
+              <span className="text-[9px] text-[#A6A8AD]">Max Slope: {routeData.max_slope_deg}°</span>
+            </div>
+
+            <div className="bg-[#22252c] p-2 rounded border border-[#33363D]">
+              <span className="text-[#A6A8AD]">Elev Gain:</span>
+              <div className="text-[#F3F3F3] font-semibold mt-0.5">
+                +{routeData.elevation_gain_m} m
+              </div>
+            </div>
+
+            <div className="bg-[#22252c] p-2 rounded border border-[#33363D]">
+              <span className="text-[#A6A8AD]">Elev Loss:</span>
+              <div className="text-[#F3F3F3] font-semibold mt-0.5">
+                -{routeData.elevation_loss_m} m
+              </div>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-[#A6A8AD] leading-tight pt-1 border-t border-[#33363D]">
+            Computed via A* over authentic 20m CTX DTM grid avoiding slopes &gt; 20°.
+          </div>
+        </div>
+      )}
 
       {/* Legend & Calibration Card */}
       <div className="absolute bottom-4 left-4 z-[1000] bg-[#191b20]/95 border border-[#33363D] text-xs text-[#A6A8AD] rounded-lg p-3 max-w-xs backdrop-blur shadow-2xl">

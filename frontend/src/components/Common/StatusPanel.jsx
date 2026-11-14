@@ -17,7 +17,8 @@ export default function StatusPanel({
   cursorCoords, 
   startPoint, 
   destinationPoint,
-  activeLayer 
+  activeLayer,
+  routeData
 }) {
   return (
     <aside className="w-80 bg-[#191b20] border-l border-[#33363D] flex flex-col justify-between overflow-y-auto select-none p-4 space-y-4">
@@ -108,6 +109,24 @@ export default function StatusPanel({
               {destinationPoint ? `${destinationPoint.lat}° N, ${destinationPoint.lng}° E` : 'Not selected (click map)'}
             </div>
           </div>
+
+          {routeData && (
+            <div className="p-2.5 rounded bg-[#101114] border border-[#D97745]/40 space-y-1 text-[11px]">
+              <div className="text-sky-400 font-bold uppercase text-[10px]">A* Computed Trajectory</div>
+              <div className="flex justify-between text-[#A6A8AD]">
+                <span>Distance:</span>
+                <span className="text-[#F3F3F3] font-bold">{routeData.distance_km} km</span>
+              </div>
+              <div className="flex justify-between text-[#A6A8AD]">
+                <span>Difficulty:</span>
+                <span className="text-emerald-400 font-semibold">{routeData.estimated_difficulty}</span>
+              </div>
+              <div className="flex justify-between text-[#A6A8AD]">
+                <span>Elev Gain:</span>
+                <span className="text-[#F3F3F3]">+{routeData.elevation_gain_m} m</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
