@@ -9,6 +9,7 @@ from ..models.schemas import (
     TerrainMetadataResponse
 )
 from ..services.dataset_service import get_registered_datasets
+from ..services.geology_service import get_geology_data
 from ..processing.terrain_processor import terrain_engine, JEZERO_BOUNDS_DEG
 from ..core.config import PROJECT_NAME, TARGET_REGION, PROJECT_VERSION, PROCESSED_DATA_DIR
 
@@ -70,15 +71,27 @@ async def get_terrain_metadata():
         mean_elevation_m=-2356.87
     )
 
+@router.get("/science/geology")
+async def get_planetary_geology():
+    """
+    Returns authentic USGS geological units and Perseverance observation stops.
+    Based on USGS Jezero Geologic Mapping Program (SIM 3464).
+    """
+    return get_geology_data()
+
 @router.get("/terrain/overlay/{overlay_type}")
 async def get_terrain_overlay(overlay_type: str):
-    """Serves the generated elevation or slope hazard visualization overlay."""
+    """Serves the generated elevation, slope hazard, or local CTX visualization overlay."""
     if overlay_type == "elevation":
         overlay_path = PROCESSED_DATA_DIR / "jezero_elevation_overlay.png"
     elif overlay_type == "slope":
         overlay_path = PROCESSED_DATA_DIR / "jezero_slope_overlay.png"
+    elif overlay_type == "ctx":
+        overlay_path = PROCESSED_DATA_DIR / "jezero_ctx_local_overlay.png"
+        if not overlay_path.exists():
+            terrain_engine.generate_ctx_overlay()
     else:
-        raise HTTPException(status_code=404, detail="Invalid overlay type. Use 'elevation' or 'slope'.")
+        raise HTTPException(status_code=404, detail="Invalid overlay type. Use 'ctx', 'elevation', or 'slope'.")
 
     if not overlay_path.exists():
         terrain_engine.generate_visualization_overlays()

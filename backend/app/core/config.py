@@ -1,5 +1,8 @@
+import os
 from pathlib import Path
-from pydantic import BaseModel
+
+# Fix matplotlib cache dir warning
+os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib"
 
 # Base directory paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
@@ -14,3 +17,16 @@ TARGET_REGION = "Jezero Crater Delta, Mars"
 MARS_RADIUS_EQUATORIAL_M = 3396190.0
 MARS_RADIUS_POLAR_M = 3376200.0
 
+def find_file(pattern: str) -> Path | None:
+    """
+    Searches both data/ and data/raw/ for a file matching pattern.
+    Supports user dropping files in data/ or data/raw/.
+    """
+    search_dirs = [DATA_DIR, RAW_DATA_DIR]
+    for d in search_dirs:
+        if d.exists():
+            matches = list(d.glob(pattern))
+            if matches:
+                # Return newest or largest match
+                return matches[0]
+    return None

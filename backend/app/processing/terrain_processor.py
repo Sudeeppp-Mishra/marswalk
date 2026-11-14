@@ -1,13 +1,11 @@
+import os
 import numpy as np
 import rasterio
 from pathlib import Path
 from PIL import Image
 import matplotlib.cm as cm
-from ..core.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, MARS_RADIUS_EQUATORIAL_M
+from ..core.config import DATA_DIR, RAW_DATA_DIR, PROCESSED_DATA_DIR, MARS_RADIUS_EQUATORIAL_M, find_file
 from ..algorithms.astar import AStarPlanner
-
-DTM_FILENAME = "JEZ_ctx_B_soc_008_DTM_MOLAtopography_DeltaGeoid_20m_Eqc_latTs0_lon0.tif"
-ORTHO_FILENAME = "JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0.tif"
 
 # Jezero Delta Bounding Box in Degrees
 JEZERO_BOUNDS_DEG = {
@@ -19,8 +17,6 @@ JEZERO_BOUNDS_DEG = {
 
 class TerrainProcessor:
     def __init__(self):
-        self.dtm_path = RAW_DATA_DIR / DTM_FILENAME
-        self.ortho_path = RAW_DATA_DIR / ORTHO_FILENAME
         self._dtm_dataset = None
         self._elevation = None
         self._slope = None
@@ -28,12 +24,23 @@ class TerrainProcessor:
         self._transform = None
         self._res = (20.0, 20.0)
 
+    def _resolve_dtm_path(self) -> Path:
+        p = find_file("*DTM*.tif") or find_file("*dtm*.tif") or find_file("*DEM*.tif") or find_file("*dem*.tif")
+        if not p or not p.exists():
+            raise FileNotFoundError("DTM elevation file not found in data/ or data/raw/")
+        return p
+
+    def _resolve_ctx_path(self) -> Path | None:
+        return find_file("*ctx*ortho*.tif") or find_file("*CTX*ortho*.tif") or find_file("*ctx*.tif")
+
+    def _resolve_hirise_path(self) -> Path | None:
+        return find_file("*hirise*.tif") or find_file("*HIRISE*.tif") or find_file("*hirise*.jp2")
+
     def load_dtm(self):
         """Loads the CTX DTM raster safely and computes slope."""
-        if not self.dtm_path.exists():
-            raise FileNotFoundError(f"DTM file not found at {self.dtm_path}")
+        dtm_path = self._resolve_dtm_path()
 
-        with rasterio.open(self.dtm_path) as src:
+        with rasterio.open(dtm_path) as src:
             self._dtm_dataset = src
             self._transform = src.transform
             self._res = src.res
@@ -71,13 +78,10 @@ class TerrainProcessor:
         if self._elevation is None:
             self.load_dtm()
 
-        # Project lat/lon to Equidistant Cylindrical (ESRI:103885)
-        # x = R * lon_rad, y = R * lat_rad
         r = MARS_RADIUS_EQUATORIAL_M
         x = r * np.radians(lng)
         y = r * np.radians(lat)
 
-        # Invert affine transform to get row and col
         inv_transform = ~self._transform
         col, row = inv_transform * (x, y)
         col, row = int(round(col)), int(round(row))
@@ -96,6 +100,38 @@ class TerrainProcessor:
             }
         return {"valid": False, "elevation_m": None, "slope_deg": None}
 
+    def generate_ctx_overlay(self) -> Path | None:
+        """
+        Generates an optimized local 8-bit grayscale PNG overlay directly from
+        the user's downloaded CTX GeoTIFF file.
+        """
+        ctx_file = self._resolve_ctx_path()
+        if not ctx_file or not ctx_file.exists():
+            return None
+
+        out_path = PROCESSED_DATA_DIR / "jezero_ctx_local_overlay.png"
+        if out_path.exists():
+            return out_path
+
+        PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with rasterio.open(ctx_file) as src:
+            # Resample to ~1700x1600 for instant, smooth browser rendering
+            out_shape = (src.height // 3, src.width // 3)
+            data = src.read(1, out_shape=out_shape, resampling=rasterio.enums.Resampling.bilinear)
+            
+            # Contrast stretching for clear crater/ridge visibility
+            valid = data[data > 0]
+            if len(valid) > 0:
+                p2, p98 = np.percentile(valid, 2), np.percentile(valid, 98)
+                stretched = np.clip((data.astype(np.float32) - p2) / max(1.0, (p98 - p2)) * 255.0, 0, 255).astype(np.uint8)
+            else:
+                stretched = data
+
+            img = Image.fromarray(stretched)
+            img.save(out_path, "PNG", optimize=True)
+
+        return out_path
+
     def generate_visualization_overlays(self):
         """
         Generates colorized PNG overlays for elevation and slope to display in Leaflet.
@@ -107,28 +143,32 @@ class TerrainProcessor:
         PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
         # 1. Elevation Color Overlay (Turbo colormap)
-        valid_elev = self._elevation[~np.isnan(self._elevation)]
-        vmin, vmax = np.percentile(valid_elev, 1), np.percentile(valid_elev, 99)
-        norm_elev = np.clip((self._elevation - vmin) / (vmax - vmin), 0, 1)
-        
-        elev_rgba = cm.turbo(norm_elev)
-        elev_rgba[np.isnan(self._elevation)] = [0, 0, 0, 0] # transparent
-        elev_rgba[:, :, 3] = np.where(np.isnan(self._elevation), 0, 0.75) # 75% opacity
-        
-        elev_img = Image.fromarray((elev_rgba * 255).astype(np.uint8))
         elev_out = PROCESSED_DATA_DIR / "jezero_elevation_overlay.png"
-        elev_img.save(elev_out, "PNG", optimize=True)
+        if not elev_out.exists():
+            valid_elev = self._elevation[~np.isnan(self._elevation)]
+            vmin, vmax = np.percentile(valid_elev, 1), np.percentile(valid_elev, 99)
+            norm_elev = np.clip((self._elevation - vmin) / (vmax - vmin), 0, 1)
+            
+            elev_rgba = cm.turbo(norm_elev)
+            elev_rgba[np.isnan(self._elevation)] = [0, 0, 0, 0]
+            elev_rgba[:, :, 3] = np.where(np.isnan(self._elevation), 0, 0.75)
+            
+            elev_img = Image.fromarray((elev_rgba * 255).astype(np.uint8))
+            elev_img.save(elev_out, "PNG", optimize=True)
 
-        # 2. Slope Hazard Color Overlay (Viridis / RdYlGn inverted)
-        # 0-10 deg: Green (safe), 10-20 deg: Yellow (caution), >20 deg: Red (hazard)
-        norm_slope = np.clip(self._slope / 30.0, 0, 1) # 0 to 30 deg scale
-        slope_rgba = cm.magma(norm_slope)
-        slope_rgba[np.isnan(self._slope)] = [0, 0, 0, 0]
-        slope_rgba[:, :, 3] = np.where(np.isnan(self._slope), 0, 0.75)
-        
-        slope_img = Image.fromarray((slope_rgba * 255).astype(np.uint8))
+        # 2. Slope Hazard Color Overlay (Magma)
         slope_out = PROCESSED_DATA_DIR / "jezero_slope_overlay.png"
-        slope_img.save(slope_out, "PNG", optimize=True)
+        if not slope_out.exists():
+            norm_slope = np.clip(self._slope / 30.0, 0, 1)
+            slope_rgba = cm.magma(norm_slope)
+            slope_rgba[np.isnan(self._slope)] = [0, 0, 0, 0]
+            slope_rgba[:, :, 3] = np.where(np.isnan(self._slope), 0, 0.75)
+            
+            slope_img = Image.fromarray((slope_rgba * 255).astype(np.uint8))
+            slope_img.save(slope_out, "PNG", optimize=True)
+
+        # 3. Local CTX overlay
+        self.generate_ctx_overlay()
 
         return {
             "elevation_overlay": str(elev_out),
@@ -143,7 +183,7 @@ class TerrainProcessor:
         dest_lat: float,
         dest_lng: float,
         max_slope_deg: float = 20.0
-    ) -> Dict[str, Any]:
+    ) -> dict:
         """
         Calculates suggested path between start and destination coordinates.
         Returns GeoJSON-compatible coordinates sequence and terrain statistics.
@@ -183,14 +223,12 @@ class TerrainProcessor:
                 "distance_meters": None,
                 "assumptions": [
                     f"Slope threshold: {max_slope_deg}°",
-                    "Path blocked by terrain hazards or invalid coordinates"
+                    "Path blocked by steep terrain hazards (> 20°) or coordinates outside DTM"
                 ]
             }
 
-        # Transform grid coordinates back to (lat, lng) sequence
         path_rc = result.pop("path_rc")
         coordinates = []
-        elevation_profile = []
 
         for row, col in path_rc:
             x, y = self._transform * (col, row)
@@ -220,4 +258,3 @@ class TerrainProcessor:
         }
 
 terrain_engine = TerrainProcessor()
-
