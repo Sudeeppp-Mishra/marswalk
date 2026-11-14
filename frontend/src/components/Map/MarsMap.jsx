@@ -7,6 +7,7 @@ import {
   Popup, 
   Rectangle, 
   Polyline, 
+  ZoomControl,
   useMap,
   useMapEvents 
 } from 'react-leaflet';
@@ -15,6 +16,7 @@ import {
   Layers, 
   MapPin, 
   Eye, 
+  EyeOff,
   AlertCircle, 
   Compass, 
   Navigation as NavIcon, 
@@ -42,7 +44,34 @@ const HIRISE_BOUNDS = [
 
 const JEZERO_CENTER = [18.38, 77.58];
 
-// Helper to auto-fit map view to calculated trajectory
+// Futuristic Space HUD Icons for Start, Destination, and Rover Sols
+const startIcon = L.divIcon({
+  className: 'custom-start-marker',
+  html: `<div style="background:#10B981; color:#064E3B; font-family:monospace; font-size:10px; font-weight:800; padding:2px 7px; border-radius:4px; box-shadow:0 0 12px rgba(16,185,129,0.9); border:1.5px solid #fff; white-space:nowrap; display:flex; align-items:center; gap:3px;">
+    <span>●</span> ORIGIN
+  </div>`,
+  iconSize: [58, 22],
+  iconAnchor: [29, 22]
+});
+
+const destIcon = L.divIcon({
+  className: 'custom-dest-marker',
+  html: `<div style="background:#D97745; color:#fff; font-family:monospace; font-size:10px; font-weight:800; padding:2px 7px; border-radius:4px; box-shadow:0 0 12px rgba(217,119,69,0.9); border:1.5px solid #fff; white-space:nowrap; display:flex; align-items:center; gap:3px;">
+    <span>★</span> TARGET
+  </div>`,
+  iconSize: [58, 22],
+  iconAnchor: [29, 22]
+});
+
+const createRoverIcon = (sol) => L.divIcon({
+  className: 'custom-sol-marker',
+  html: `<div style="background:#191b20/95; background-color: rgba(25, 27, 32, 0.9); color:#38BDF8; border:1px solid #38BDF8; font-family:monospace; font-size:9px; font-weight:bold; padding:1px 5px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.8); white-space:nowrap; cursor:pointer;">
+    Sol ${sol}
+  </div>`,
+  iconSize: [46, 18],
+  iconAnchor: [23, 9]
+});
+
 function RouteAutoFitter({ polylineCoords }) {
   const map = useMap();
   useEffect(() => {
@@ -53,7 +82,6 @@ function RouteAutoFitter({ polylineCoords }) {
   return null;
 }
 
-// Mouse movement tracker and click handler
 function MapEventsHandler({ onCursorMove, onMapClick }) {
   const throttleRef = useRef(0);
 
@@ -86,8 +114,11 @@ export default function MarsMap({
   setMaxSlope
 }) {
   const [terrainSample, setTerrainSample] = useState(null);
-  const [showGeology, setShowGeology] = useState(true);
-  const [showObservations, setShowObservations] = useState(true);
+  
+  // OFF BY DEFAULT so map starts 100% clean and pristine!
+  const [showGeology, setShowGeology] = useState(false);
+  const [showObservations, setShowObservations] = useState(false);
+
   const [geologyData, setGeologyData] = useState({ geological_units: [], rover_observations: [] });
   const [isCalculating, setIsCalculating] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState(null);
@@ -136,7 +167,7 @@ export default function MarsMap({
     if (!isInsideBounds(lat, lng)) {
       setFeedbackMsg({
         type: 'warning',
-        text: 'Coordinate is outside Jezero DTM coverage. Click inside the dashed border.'
+        text: 'Coordinate is outside Jezero DTM coverage (18.21°–18.72°N, 77.16°–77.70°E).'
       });
       setTimeout(() => setFeedbackMsg(null), 4000);
       return;
@@ -144,11 +175,11 @@ export default function MarsMap({
 
     if (!startPoint) {
       onSelectPoint('start', { lat, lng });
-      setFeedbackMsg({ type: 'info', text: 'Origin set. Click destination to complete waypoint pair.' });
+      setFeedbackMsg({ type: 'info', text: 'Origin set. Click destination on the map.' });
       setTimeout(() => setFeedbackMsg(null), 3000);
     } else if (!destinationPoint) {
       onSelectPoint('destination', { lat, lng });
-      setFeedbackMsg({ type: 'success', text: 'Waypoints set. Click "Compute Suggested Route" below.' });
+      setFeedbackMsg({ type: 'success', text: 'Waypoints set. Click "Compute Suggested Route".' });
       setTimeout(() => setFeedbackMsg(null), 3500);
     } else {
       onSelectPoint('start', { lat, lng });
@@ -167,7 +198,7 @@ export default function MarsMap({
 
     if (res && res.status === 'success') {
       setRouteData(res);
-      setFeedbackMsg({ type: 'success', text: `Path found: ${res.distance_km} km (${res.estimated_difficulty})` });
+      setFeedbackMsg({ type: 'success', text: `Route computed: ${res.distance_km} km (${res.estimated_difficulty})` });
       setTimeout(() => setFeedbackMsg(null), 4000);
     } else {
       setFeedbackMsg({ type: 'error', text: res?.error || 'Path blocked by steep terrain hazards (> 20°).' });
@@ -186,13 +217,13 @@ export default function MarsMap({
       onSelectPoint('start', { lat: 18.4447, lng: 77.4508 });
       onSelectPoint('destination', { lat: 18.4231, lng: 77.4125 });
       setRouteData(null);
-      setFeedbackMsg({ type: 'info', text: 'Preset loaded: Landing site to Kodiak Butte.' });
+      setFeedbackMsg({ type: 'info', text: 'Loaded preset: Landing Site to Kodiak Butte.' });
       setTimeout(() => setFeedbackMsg(null), 3000);
     } else if (preset === 'delta_traverse') {
       onSelectPoint('start', { lat: 18.4352, lng: 77.4208 });
       onSelectPoint('destination', { lat: 18.4412, lng: 77.4081 });
       setRouteData(null);
-      setFeedbackMsg({ type: 'info', text: 'Preset loaded: Three Forks to Wildcat Ridge.' });
+      setFeedbackMsg({ type: 'info', text: 'Loaded preset: Three Forks to Wildcat Ridge.' });
       setTimeout(() => setFeedbackMsg(null), 3000);
     }
   };
@@ -201,159 +232,175 @@ export default function MarsMap({
 
   return (
     <div className="relative w-full h-full bg-[#101114] overflow-hidden flex flex-col">
-      {/* Top Left Layer & Filter Selector HUD */}
-      <div className="absolute top-4 left-4 z-[1000] flex flex-wrap gap-2">
-        <div className="bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg p-1.5 flex items-center space-x-1 shadow-xl">
-          <button
-            onClick={() => setActiveLayer('ctx')}
-            className={`px-3 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
-              activeLayer === 'ctx'
-                ? 'bg-[#D97745] text-white font-medium shadow-md'
-                : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-            }`}
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>MRO CTX (Local 6m)</span>
-          </button>
-          <button
-            onClick={() => setActiveLayer('hirise')}
-            className={`px-3 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
-              activeLayer === 'hirise'
-                ? 'bg-[#D97745] text-white font-medium shadow-md'
-                : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-            }`}
-          >
-            <Scan className="w-3.5 h-3.5 text-sky-400" />
-            <span>HiRISE Ultra-HD (25cm)</span>
-          </button>
-          <button
-            onClick={() => setActiveLayer('elevation')}
-            className={`px-3 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
-              activeLayer === 'elevation'
-                ? 'bg-[#D97745] text-white font-medium shadow-md'
-                : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-            }`}
-          >
-            <span>Elevation DEM</span>
-          </button>
-          <button
-            onClick={() => setActiveLayer('slope')}
-            className={`px-3 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
-              activeLayer === 'slope'
-                ? 'bg-[#D97745] text-white font-medium shadow-md'
-                : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-            }`}
-          >
-            <span>Slope Hazard</span>
-          </button>
-          <button
-            onClick={() => setActiveLayer('viking')}
-            className={`px-3 py-1.5 rounded text-xs font-mono transition-colors ${
-              activeLayer === 'viking'
-                ? 'bg-[#D97745] text-white font-medium shadow-md'
-                : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-            }`}
-          >
-            Global Base
-          </button>
-        </div>
+      {/* Top Map HUD Bar - Unified, responsive container to prevent any overlap */}
+      <div className="absolute top-3 left-3 right-3 z-[1000] pointer-events-none flex flex-col gap-2">
+        {/* Row 1: Left controls (Layers & Science) + Right controls (Waypoints & Action) */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Left Group: Layers and Science Overlays */}
+          <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
+            {/* Layer Selector */}
+            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-1 flex items-center space-x-1 shadow-xl">
+              <button
+                onClick={() => setActiveLayer('ctx')}
+                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
+                  activeLayer === 'ctx'
+                    ? 'bg-[#D97745] text-white font-medium shadow-md'
+                    : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
+                }`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>CTX (6m)</span>
+              </button>
+              <button
+                onClick={() => setActiveLayer('hirise')}
+                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
+                  activeLayer === 'hirise'
+                    ? 'bg-[#D97745] text-white font-medium shadow-md'
+                    : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
+                }`}
+              >
+                <Scan className="w-3.5 h-3.5 text-sky-400" />
+                <span>HiRISE (25cm)</span>
+              </button>
+              <button
+                onClick={() => setActiveLayer('elevation')}
+                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
+                  activeLayer === 'elevation'
+                    ? 'bg-[#D97745] text-white font-medium shadow-md'
+                    : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
+                }`}
+              >
+                <span>Elevation</span>
+              </button>
+              <button
+                onClick={() => setActiveLayer('slope')}
+                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
+                  activeLayer === 'slope'
+                    ? 'bg-[#D97745] text-white font-medium shadow-md'
+                    : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
+                }`}
+              >
+                <span>Slope Hazard</span>
+              </button>
+              <button
+                onClick={() => setActiveLayer('viking')}
+                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors ${
+                  activeLayer === 'viking'
+                    ? 'bg-[#D97745] text-white font-medium shadow-md'
+                    : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
+                }`}
+              >
+                Global Base
+              </button>
+            </div>
 
-        {/* Feature Toggles */}
-        <div className="bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg p-1.5 flex items-center space-x-1 shadow-xl">
-          <button
-            onClick={() => setShowGeology(!showGeology)}
-            className={`px-2.5 py-1.5 rounded text-[11px] font-mono border transition-colors ${
-              showGeology 
-                ? 'bg-[#22252c] text-amber-400 border-amber-500/40' 
-                : 'bg-transparent text-[#A6A8AD] border-transparent hover:bg-[#22252c]'
-            }`}
-          >
-            USGS Geology: {showGeology ? 'ON' : 'OFF'}
-          </button>
+            {/* Science Overlays Toggles */}
+            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-1 flex items-center space-x-1 shadow-xl">
+              <button
+                onClick={() => setShowGeology(!showGeology)}
+                className={`px-2.5 py-1.5 rounded text-[11px] font-mono border transition-colors flex items-center space-x-1.5 ${
+                  showGeology 
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 font-semibold' 
+                    : 'bg-transparent text-[#A6A8AD] border-transparent hover:bg-[#22252c] hover:text-[#F3F3F3]'
+                }`}
+              >
+                <span>USGS Geology</span>
+                <span className={`text-[9px] px-1 rounded ${showGeology ? 'bg-amber-500 text-black font-bold' : 'bg-[#101114]'}`}>
+                  {showGeology ? 'ON' : 'OFF'}
+                </span>
+              </button>
 
-          <button
-            onClick={() => setShowObservations(!showObservations)}
-            className={`px-2.5 py-1.5 rounded text-[11px] font-mono border transition-colors ${
-              showObservations 
-                ? 'bg-[#22252c] text-emerald-400 border-emerald-500/40' 
-                : 'bg-transparent text-[#A6A8AD] border-transparent hover:bg-[#22252c]'
-            }`}
-          >
-            Rover Sites: {showObservations ? 'ON' : 'OFF'}
-          </button>
-        </div>
-
-        {/* Mission Presets */}
-        <div className="bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg p-1.5 flex items-center space-x-1 shadow-xl">
-          <button
-            onClick={() => handleApplyPreset('perseverance_to_kodiak')}
-            className="px-2 py-1.5 rounded text-[10px] font-mono text-[#A6A8AD] hover:text-[#D97745] hover:bg-[#22252c] transition-colors"
-          >
-            Preset: Landing → Kodiak
-          </button>
-          <button
-            onClick={() => handleApplyPreset('delta_traverse')}
-            className="px-2 py-1.5 rounded text-[10px] font-mono text-[#A6A8AD] hover:text-[#D97745] hover:bg-[#22252c] transition-colors"
-          >
-            Preset: Delta Traverse
-          </button>
-        </div>
-      </div>
-
-      {/* Top Right Waypoint Controls & Feedback */}
-      <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end space-y-2">
-        <div className="bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg px-3 py-2 text-xs font-mono shadow-xl flex items-center space-x-3">
-          <div className="flex items-center space-x-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-            <span className="text-[#A6A8AD]">START:</span>
-            <span className="text-[#F3F3F3]">
-              {startPoint ? `${startPoint.lat}°, ${startPoint.lng}°` : 'Click map to place'}
-            </span>
-          </div>
-          <div className="w-[1px] h-4 bg-[#33363D]"></div>
-          <div className="flex items-center space-x-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#D97745] inline-block animate-pulse"></span>
-            <span className="text-[#A6A8AD]">DEST:</span>
-            <span className="text-[#F3F3F3]">
-              {destinationPoint ? `${destinationPoint.lat}°, ${destinationPoint.lng}°` : 'Click map to place'}
-            </span>
+              <button
+                onClick={() => setShowObservations(!showObservations)}
+                className={`px-2.5 py-1.5 rounded text-[11px] font-mono border transition-colors flex items-center space-x-1.5 ${
+                  showObservations 
+                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/60 font-semibold' 
+                    : 'bg-transparent text-[#A6A8AD] border-transparent hover:bg-[#22252c] hover:text-[#F3F3F3]'
+                }`}
+              >
+                <span>Rover Sols</span>
+                <span className={`text-[9px] px-1 rounded ${showObservations ? 'bg-sky-400 text-black font-bold' : 'bg-[#101114]'}`}>
+                  {showObservations ? 'ON' : 'OFF'}
+                </span>
+              </button>
+            </div>
           </div>
 
-          {(startPoint || destinationPoint) && (
+          {/* Right Group: Waypoints & Route Action */}
+          <div className="flex items-center gap-2 pointer-events-auto ml-auto">
+            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg px-3 py-1.5 text-xs font-mono shadow-xl flex items-center space-x-2.5">
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                <span className="text-[#A6A8AD]">START:</span>
+                <span className="text-[#F3F3F3]">
+                  {startPoint ? `${startPoint.lat}°, ${startPoint.lng}°` : 'Click map'}
+                </span>
+              </div>
+              <div className="w-[1px] h-3.5 bg-[#33363D]"></div>
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#D97745] inline-block animate-pulse"></span>
+                <span className="text-[#A6A8AD]">DEST:</span>
+                <span className="text-[#F3F3F3]">
+                  {destinationPoint ? `${destinationPoint.lat}°, ${destinationPoint.lng}°` : 'Click map'}
+                </span>
+              </div>
+
+              {(startPoint || destinationPoint) && (
+                <button
+                  onClick={handleResetPoints}
+                  title="Reset Waypoints"
+                  className="p-1 rounded hover:bg-[#22252c] text-[#A6A8AD] hover:text-rose-400 transition-colors ml-1"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Compute Route Trigger */}
+            {startPoint && destinationPoint && !routeData && (
+              <button
+                onClick={handleComputeRoute}
+                disabled={isCalculating}
+                className="bg-[#D97745] hover:bg-[#B85C38] text-white px-3.5 py-1.5 rounded-lg font-mono text-xs font-semibold shadow-xl flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap"
+              >
+                <Play className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : ''}`} />
+                <span>{isCalculating ? 'COMPUTING...' : 'COMPUTE ROUTE'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: Mission Presets + Toast Notifications */}
+        <div className="flex items-center justify-between gap-2 pointer-events-none">
+          <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-1 flex items-center space-x-1.5 shadow-lg pointer-events-auto">
+            <span className="text-[10px] font-mono uppercase text-[#A6A8AD] px-1.5">Presets:</span>
             <button
-              onClick={handleResetPoints}
-              title="Reset Waypoints"
-              className="p-1 rounded hover:bg-[#22252c] text-[#A6A8AD] hover:text-rose-400 transition-colors"
+              onClick={() => handleApplyPreset('perseverance_to_kodiak')}
+              className="px-2 py-1 rounded text-[11px] font-mono text-[#A6A8AD] hover:text-[#D97745] hover:bg-[#22252c] transition-colors"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              Landing → Kodiak
             </button>
+            <button
+              onClick={() => handleApplyPreset('delta_traverse')}
+              className="px-2 py-1 rounded text-[11px] font-mono text-[#A6A8AD] hover:text-[#D97745] hover:bg-[#22252c] transition-colors"
+            >
+              Delta Traverse
+            </button>
+          </div>
+
+          {/* Notification Toast */}
+          {feedbackMsg && (
+            <div className={`pointer-events-auto text-xs font-mono px-3 py-1.5 rounded-lg max-w-sm shadow-xl backdrop-blur-md border transition-all ${
+              feedbackMsg.type === 'error'
+                ? 'bg-rose-950/90 border-rose-500/50 text-rose-200'
+                : feedbackMsg.type === 'warning'
+                ? 'bg-amber-950/90 border-amber-500/50 text-amber-200'
+                : 'bg-[#191b20]/95 border-emerald-500/50 text-emerald-300'
+            }`}>
+              {feedbackMsg.text}
+            </div>
           )}
         </div>
-
-        {/* Compute Route Trigger */}
-        {startPoint && destinationPoint && !routeData && (
-          <button
-            onClick={handleComputeRoute}
-            disabled={isCalculating}
-            className="bg-[#D97745] hover:bg-[#B85C38] text-white px-4 py-2 rounded-lg font-mono text-xs font-semibold shadow-2xl flex items-center space-x-2 transition-all transform hover:scale-105 active:scale-95"
-          >
-            <Play className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : ''}`} />
-            <span>{isCalculating ? 'COMPUTING A* TRAJECTORY...' : 'COMPUTE SUGGESTED ROUTE'}</span>
-          </button>
-        )}
-
-        {/* Notification Toast */}
-        {feedbackMsg && (
-          <div className={`text-xs font-mono px-3 py-2 rounded-lg max-w-sm shadow-xl backdrop-blur-md border ${
-            feedbackMsg.type === 'error'
-              ? 'bg-rose-950/90 border-rose-500/50 text-rose-200'
-              : feedbackMsg.type === 'warning'
-              ? 'bg-amber-950/90 border-amber-500/50 text-amber-200'
-              : 'bg-[#191b20]/95 border-emerald-500/50 text-emerald-300'
-          }`}>
-            {feedbackMsg.text}
-          </div>
-        )}
       </div>
 
       {/* Main Leaflet Map Container */}
@@ -364,7 +411,9 @@ export default function MarsMap({
         maxZoom={16}
         className="w-full h-full z-0"
         scrollWheelZoom={true}
+        zoomControl={false}
       >
+        <ZoomControl position="bottomright" />
         <MapEventsHandler 
           onCursorMove={handleCursorMove} 
           onMapClick={handleMapClick} 
@@ -379,7 +428,7 @@ export default function MarsMap({
           maxZoom={16}
         />
 
-        {/* Authentic Local CTX Image Overlay (Rendered from user's downloaded GeoTIFF) */}
+        {/* Authentic Local CTX Image Overlay (Rendered directly from user's downloaded GeoTIFF) */}
         {activeLayer === 'ctx' && (
           <ImageOverlay
             url={getOverlayUrl('ctx')}
@@ -419,7 +468,7 @@ export default function MarsMap({
           />
         )}
 
-        {/* USGS Geological Units Polygons */}
+        {/* USGS Geological Units Polygons (Hidden by default, shown when toggled ON) */}
         {showGeology && geologyData.geological_units.map((unit) => (
           <Rectangle
             key={unit.id}
@@ -429,10 +478,10 @@ export default function MarsMap({
             ]}
             pathOptions={{
               color: unit.color,
-              weight: 2,
+              weight: 1.5,
               fillColor: unit.color,
-              fillOpacity: 0.18,
-              dashArray: '3, 3'
+              fillOpacity: 0.12,
+              dashArray: '4, 4'
             }}
           >
             <Popup>
@@ -452,13 +501,17 @@ export default function MarsMap({
           </Rectangle>
         ))}
 
-        {/* Authentic Perseverance Observation Stops */}
+        {/* Authentic Perseverance Observation Stops (Hidden by default, shown when toggled ON with sleek badges) */}
         {showObservations && geologyData.rover_observations.map((obs, idx) => (
-          <Marker key={idx} position={obs.coords}>
+          <Marker 
+            key={idx} 
+            position={obs.coords}
+            icon={createRoverIcon(obs.sol)}
+          >
             <Popup>
               <div className="p-1 font-mono text-xs max-w-xs space-y-1.5">
                 <div className="flex items-center justify-between border-b border-[#33363D] pb-1">
-                  <span className="font-bold text-emerald-400">Sol {obs.sol}: {obs.name}</span>
+                  <span className="font-bold text-sky-400">Sol {obs.sol}: {obs.name}</span>
                   <span className="text-[9px] px-1 py-0.5 rounded bg-[#22252c] text-[#A6A8AD]">
                     {obs.elevation_m}m
                   </span>
@@ -468,7 +521,7 @@ export default function MarsMap({
                 <div className="text-[10px] text-[#A6A8AD]"><strong className="text-[#F3F3F3]">Sensors:</strong> {obs.instrument}</div>
                 <p className="text-[11px] text-[#F3F3F3] leading-tight pt-1">{obs.significance}</p>
                 
-                {/* Direct Action Buttons to Set Waypoint */}
+                {/* 1-Click Action Buttons to Set as Origin or Destination */}
                 <div className="flex space-x-2 pt-2 border-t border-[#33363D]">
                   <button
                     onClick={() => {
@@ -494,17 +547,6 @@ export default function MarsMap({
           </Marker>
         ))}
 
-        {/* Jezero Delta Bounding Box */}
-        <Rectangle
-          bounds={JEZERO_BOUNDS}
-          pathOptions={{
-            color: '#D97745',
-            weight: 1,
-            fill: false,
-            dashArray: '4, 4'
-          }}
-        />
-
         {/* Computed Trajectory Polyline */}
         {polylineCoords.length > 0 && (
           <>
@@ -528,10 +570,11 @@ export default function MarsMap({
           </>
         )}
 
-        {/* Start Point Marker (Draggable) */}
+        {/* Start Point Marker (Draggable with futuristic badge) */}
         {startPoint && (
           <Marker 
             position={[startPoint.lat, startPoint.lng]}
+            icon={startIcon}
             draggable={true}
             eventHandlers={{
               dragend: (e) => {
@@ -547,16 +590,17 @@ export default function MarsMap({
                 <p className="font-bold text-emerald-400">ORIGIN WAYPOINT</p>
                 <p>Lat: {startPoint.lat}° N</p>
                 <p>Lon: {startPoint.lng}° E</p>
-                <p className="text-[10px] text-[#A6A8AD] mt-1">(Drag to reposition)</p>
+                <p className="text-[10px] text-[#A6A8AD] mt-1">(Drag on terrain to reposition)</p>
               </div>
             </Popup>
           </Marker>
         )}
 
-        {/* Destination Point Marker (Draggable) */}
+        {/* Destination Point Marker (Draggable with futuristic badge) */}
         {destinationPoint && (
           <Marker 
             position={[destinationPoint.lat, destinationPoint.lng]}
+            icon={destIcon}
             draggable={true}
             eventHandlers={{
               dragend: (e) => {
@@ -572,7 +616,7 @@ export default function MarsMap({
                 <p className="font-bold text-[#D97745]">DESTINATION WAYPOINT</p>
                 <p>Lat: {destinationPoint.lat}° N</p>
                 <p>Lon: {destinationPoint.lng}° E</p>
-                <p className="text-[10px] text-[#A6A8AD] mt-1">(Drag to reposition)</p>
+                <p className="text-[10px] text-[#A6A8AD] mt-1">(Drag on terrain to reposition)</p>
               </div>
             </Popup>
           </Marker>
