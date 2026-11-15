@@ -178,6 +178,17 @@ export default function Terrain3DModal({
     setDestPoint(initialDestPoint);
   }, [initialDestPoint]);
 
+  // Sample exact terrain mesh height at any 3D X, Z coordinates directly from heightGrid
+  const sampleTerrainHeightAtXZ = (x, z, heightGrid, exag = 2.2) => {
+    if (!heightGrid) return 0;
+    const normU = Math.min(1.0, Math.max(0.0, (x + 50) / 100));
+    const normV = Math.min(1.0, Math.max(0.0, (z + 50) / 100));
+    const gx = Math.min(511, Math.max(0, Math.round(normU * 511)));
+    const gy = Math.min(511, Math.max(0, Math.round(normV * 511)));
+    const hNorm = heightGrid[gy * 512 + gx] / 255.0;
+    return hNorm * 12.0 * exag;
+  };
+
   // Convert (lat, lng, elev) to 3D X, Y, Z space (mesh centered at 0, 0, size 100x100)
   const geoTo3D = (lat, lng, elev = null, heightGrid = null, exag = 2.2) => {
     const normX = (lng - JEZERO_BOUNDS.minLng) / (JEZERO_BOUNDS.maxLng - JEZERO_BOUNDS.minLng);
@@ -186,16 +197,13 @@ export default function Terrain3DModal({
     const x = (normX - 0.5) * 100;
     const z = (0.5 - normY) * 100; // Inverted for 3D coordinate space
     
-    let y = 0;
-    if (elev != null) {
-      const normZ = (elev - JEZERO_BOUNDS.minElev) / (JEZERO_BOUNDS.maxElev - JEZERO_BOUNDS.minElev);
-      y = normZ * 12.0 * exag;
-    } else if (heightGrid) {
-      const gx = Math.min(511, Math.max(0, Math.round(normX * 511)));
-      const gy = Math.min(511, Math.max(0, Math.round((1 - normY) * 511)));
-      const hVal = heightGrid[gy * 512 + gx] / 255.0;
-      y = hVal * 12.0 * exag;
-    }
+    // Always sample from the terrain heightGrid if available to guarantee exact surface alignment
+    const y = heightGrid
+      ? sampleTerrainHeightAtXZ(x, z, heightGrid, exag)
+      : elev != null
+        ? ((elev - JEZERO_BOUNDS.minElev) / (JEZERO_BOUNDS.maxElev - JEZERO_BOUNDS.minElev)) * 12.0 * exag
+        : 0;
+        
     return { x, y, z };
   };
 
@@ -544,8 +552,8 @@ export default function Terrain3DModal({
         const i1 = Math.min(total, i0 + 1);
         const t = exactIdx - i0;
 
-        const p0 = geoTo3D(pts[i0].lat, pts[i0].lng, pts[i0].elevation_m, heightDataRef.current, exaggeration);
-        const p1 = geoTo3D(pts[i1].lat, pts[i1].lng, pts[i1].elevation_m, heightDataRef.current, exaggeration);
+        const p0 = geoTo3D(pts[i0].lat, pts[i0].lng, null, heightDataRef.current, exaggeration);
+        const p1 = geoTo3D(pts[i1].lat, pts[i1].lng, null, heightDataRef.current, exaggeration);
 
         const currentPos = new THREE.Vector3().lerpVectors(
           new THREE.Vector3(p0.x, p0.y + 4.2, p0.z),
@@ -584,7 +592,7 @@ export default function Terrain3DModal({
     };
   }, [isOpen]);
 
-  // Render 3D Route Spline
+  // Render 3D Route Spline — Resamples densely along terrain surface so it NEVER clips into mountains
   const render3DRoute = (scene, route, heightGrid, exag) => {
     if (routeLineRef.current) {
       scene.remove(routeLineRef.current);
@@ -592,22 +600,43 @@ export default function Terrain3DModal({
     }
     if (!route?.route || route.route.length < 2) return;
 
-    const points = [];
+    // Convert route points to 2D control points in X-Z space
+    const rawPoints2D = [];
     route.route.forEach((pt) => {
-      const pos = geoTo3D(pt.lat, pt.lng, pt.elevation_m, heightGrid, exag);
-      points.push(new THREE.Vector3(pos.x, pos.y + 0.38, pos.z));
+      const normX = (pt.lng - JEZERO_BOUNDS.minLng) / (JEZERO_BOUNDS.maxLng - JEZERO_BOUNDS.minLng);
+      const normY = (pt.lat - JEZERO_BOUNDS.minLat) / (JEZERO_BOUNDS.maxLat - JEZERO_BOUNDS.minLat);
+      const x = (normX - 0.5) * 100;
+      const z = (0.5 - normY) * 100;
+      rawPoints2D.push(new THREE.Vector2(x, z));
     });
 
-    const curve = new THREE.CatmullRomCurve3(points);
-    const tubeGeometry = new THREE.TubeGeometry(curve, points.length * 2, 0.45, 8, false);
+    // Create a 2D spline curve and resample densely along terrain surface
+    const curve2D = new THREE.SplineCurve(rawPoints2D);
+    const totalDivisions = Math.max(160, rawPoints2D.length * 4);
+    const sampled2D = curve2D.getPoints(totalDivisions);
+
+    const dense3DPoints = sampled2D.map((p) => {
+      const surfaceY = sampleTerrainHeightAtXZ(p.x, p.y, heightGrid, exag);
+      // Float 0.85 units above ground to guarantee continuous visibility over scarps, dunes & ridges
+      return new THREE.Vector3(p.x, surfaceY + 0.85, p.y);
+    });
+
+    const curve3D = new THREE.CatmullRomCurve3(dense3DPoints);
+    const tubeGeometry = new THREE.TubeGeometry(curve3D, dense3DPoints.length, 0.55, 8, false);
+
     const tubeMaterial = new THREE.MeshStandardMaterial({
       color: 0x10b981,
       emissive: 0x059669,
-      emissiveIntensity: 0.95,
-      roughness: 0.25,
-      metalness: 0.2
+      emissiveIntensity: 1.25,
+      roughness: 0.2,
+      metalness: 0.25,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -6
     });
+
     const tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
+    tubeMesh.renderOrder = 10;
     scene.add(tubeMesh);
     routeLineRef.current = tubeMesh;
   };
