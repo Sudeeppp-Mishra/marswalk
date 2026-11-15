@@ -55,7 +55,15 @@ Astro-nah is a full-stack planetary surface exploration and navigation platform 
 - **Mars 2020 Perseverance Timeline**: Sols 0, 180, 420, 550, and 750 milestone markers. At regional zoom, rendered as compact glowing radar dots; at close zoom, expanded with staggered non-overlapping badges.
 - **Floating Geology Legend**: Collapsible scientific legend that dynamically adjusts position when routes are active.
 
-### 6. Mission Dispatch Dossier & Print-Ready Brief
+### 6. Hackathon Top Value Features
+- **3-Tier Slope Hazard Overlay**: Direct RGBA raster overlay derived from the authentic 20m DTM with color-coded safety tiers: $<10^\circ$ safe green, $10^\circ-20^\circ$ caution amber, and $>20^\circ$ hazard crimson.
+- **Shortest vs. Safest Route Comparison**: Side-by-side comparison proving why slope-penalized A* matters: the direct shortest path is visualized on the map as a dashed gray line with a comparative metrics table showing how it intersects impassable $>20^\circ$ scarps while the safest route safely navigates natural depositional saddles.
+- **Rover Mode vs. Astronaut EVA Mode**: Dynamic segmented toggle that switches vehicle slope thresholds (15° for Perseverance vs. 25° for human EVA), base traversal velocities (0.12 km/h vs. 1.1 km/h), and recalculates routes on the fly.
+- **"What Does This Route Cross?" Geological Formations Summary**: Ray-casting spatial intersection across USGS SIM 3464 geological formations (Western Delta, Séítah, Máaz, Neretva Canyon) with a multi-segment progress bar and percentage breakdown.
+- **Steep-Segment Warning Badges**: Real-time callout badges positioned on the route at the peak incline (e.g. `▲ PEAK: 7.5° @ km 0.92`), alerting mission planners to maximum slopes.
+- **Tactical Measure Ruler & Quick Mission Guide**: Two-point surface distance and $\Delta z$ elevation difference ruler, plus a 3-step interactive onboarding guide for hackathon judges.
+
+### 7. Mission Dispatch Dossier & Print-Ready Brief
 - Generates an official aerospace mission dossier modal with complete coordinate lists, elevation deltas, slope gradients, and scientific disclosures.
 - Includes `@media print` stylesheets for clean single-page PDF generation.
 

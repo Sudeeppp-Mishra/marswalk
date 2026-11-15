@@ -35,6 +35,11 @@ import {
   Sparkles, 
   Download,
   Share2,
+  Ruler,
+  Truck,
+  User,
+  AlertTriangle,
+  HelpCircle,
   Keyboard,
   Navigation as NavIcon 
 } from 'lucide-react';
@@ -254,9 +259,99 @@ export default function MarsMap({
   // EVA Traverse Simulator state
   const [simState, setSimState] = useState({ isPlaying: false, stepIndex: 0, speed: 1 });
 
+  // Mode: 'rover' (Perseverance 15° limit) vs 'astronaut' (EVA Foot 25° limit)
+  const [exploreMode, setExploreMode] = useState('rover');
+  const [showShortestComparison, setShowShortestComparison] = useState(true);
+  const [isMeasureMode, setIsMeasureMode] = useState(false);
+  const [measurePoints, setMeasurePoints] = useState([]);
+  const [showGuideModal, setShowGuideModal] = useState(false);
+
   const [geologyData, setGeologyData] = useState(DEFAULT_GEOLOGY_DATA);
   const [isCalculating, setIsCalculating] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState(null);
+
+  // Point in polygon helper for geology unit intersection
+  const isPointInPolygon = (lat, lng, polygon) => {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i][0], yi = polygon[i][1];
+      const xj = polygon[j][0], yj = polygon[j][1];
+      const intersect = ((yi > lng) !== (yj > lng)) &&
+        (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  };
+
+  // Feature 4: "What does this route cross?" summary
+  const geologyCrossings = useMemo(() => {
+    if (!routeData?.route || routeData.route.length === 0 || !geologyData?.geological_units) {
+      return null;
+    }
+    const counts = {};
+    const units = geologyData.geological_units;
+    const total = routeData.route.length;
+
+    routeData.route.forEach(pt => {
+      let matched = null;
+      for (const u of units) {
+        if (u.coordinates && isPointInPolygon(pt.lat, pt.lng, u.coordinates)) {
+          matched = u;
+          break;
+        }
+      }
+      const key = matched ? matched.short_label || matched.name : 'Unmapped Basin Floor';
+      const color = matched ? matched.color : '#64748B';
+      if (!counts[key]) counts[key] = { count: 0, color, name: key };
+      counts[key].count++;
+    });
+
+    return Object.values(counts)
+      .map(item => ({
+        name: item.name,
+        color: item.color,
+        pct: Math.round((item.count / total) * 100)
+      }))
+      .filter(item => item.pct > 0)
+      .sort((a, b) => b.pct - a.pct);
+  }, [routeData, geologyData]);
+
+  // Feature 5: Steepest-segment warnings
+  const steepestSegment = useMemo(() => {
+    if (!routeData?.route || routeData.route.length === 0) return null;
+    let maxPt = routeData.route[0];
+    let maxIdx = 0;
+    routeData.route.forEach((pt, i) => {
+      if (pt.slope_deg > maxPt.slope_deg) {
+        maxPt = pt;
+        maxIdx = i;
+      }
+    });
+    const distAtSteepest = ((maxIdx / Math.max(1, routeData.route.length - 1)) * routeData.distance_km).toFixed(2);
+    return {
+      lat: maxPt.lat,
+      lng: maxPt.lng,
+      slope: maxPt.slope_deg,
+      elevation: maxPt.elevation_m,
+      km: distAtSteepest,
+      isHazard: maxPt.slope_deg > (maxSlope || 20)
+    };
+  }, [routeData, maxSlope]);
+
+  // Measure tool calculation
+  const measureResult = useMemo(() => {
+    if (measurePoints.length !== 2) return null;
+    const [p1, p2] = measurePoints;
+    const R = 3396190.0;
+    const dLat = (p2.lat - p1.lat) * (Math.PI / 180);
+    const dLng = (p2.lng - p1.lng) * (Math.PI / 180) * Math.cos(((p1.lat + p2.lat) / 2) * (Math.PI / 180));
+    const distM = Math.round(R * Math.hypot(dLat, dLng));
+    const distKm = (distM / 1000).toFixed(2);
+    const deltaElev = (p1.elevation != null && p2.elevation != null)
+      ? Math.round(p2.elevation - p1.elevation)
+      : null;
+    return { distM, distKm, deltaElev };
+  }, [measurePoints]);
 
   useEffect(() => {
     let isMounted = true;
@@ -391,6 +486,17 @@ export default function MarsMap({
       return;
     }
 
+    if (isMeasureMode) {
+      sfx.playBlip();
+      const elev = terrainSample?.valid ? terrainSample.elevation_m : null;
+      if (measurePoints.length >= 2) {
+        setMeasurePoints([{ lat, lng, elevation: elev }]);
+      } else {
+        setMeasurePoints(prev => [...prev, { lat, lng, elevation: elev }]);
+      }
+      return;
+    }
+
     sfx.playBlip();
 
     if (!startPoint) {
@@ -408,13 +514,14 @@ export default function MarsMap({
     }
   };
 
-  const handleComputeRoute = async () => {
+  const handleComputeRouteWithSlope = async (targetSlope) => {
     if (!startPoint || !destinationPoint) return;
     setIsCalculating(true);
     setFeedbackMsg(null);
     sfx.playBlip();
 
-    const res = await calculateRoute(startPoint, destinationPoint, maxSlope);
+    const slopeVal = targetSlope !== undefined ? targetSlope : maxSlope;
+    const res = await calculateRoute(startPoint, destinationPoint, slopeVal);
     setIsCalculating(false);
 
     if (res && res.status === 'success') {
@@ -429,9 +536,11 @@ export default function MarsMap({
       }
     } else {
       sfx.playWarning();
-      setFeedbackMsg({ type: 'error', text: res?.error || 'Path blocked by steep terrain hazards (> 20°).' });
+      setFeedbackMsg({ type: 'error', text: res?.error || 'Path blocked by steep terrain hazards.' });
     }
   };
+
+  const handleComputeRoute = () => handleComputeRouteWithSlope(maxSlope);
 
   const handleResetPoints = () => {
     sfx.playBlip();
@@ -657,18 +766,58 @@ export default function MarsMap({
             </div>
           </div>
 
-          {/* Right Group: Waypoints, Slope Limit, Reset & Route Action */}
+          {/* Right Group: Mode Selector, Waypoints, Slope Limit, Reset & Route Action */}
           <div className="flex items-center gap-2 pointer-events-auto ml-auto">
+            {/* Rover Mode vs Astronaut Mode Segmented Switch */}
+            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-0.5 flex items-center space-x-1 shadow-xl">
+              <button
+                onClick={() => {
+                  setExploreMode('rover');
+                  if (setMaxSlope) setMaxSlope(15);
+                  sfx.playBlip();
+                  if (startPoint && destinationPoint) handleComputeRouteWithSlope(15);
+                }}
+                title="Rover Mode (Perseverance 15° vehicle slope limit, 0.12 km/h)"
+                className={`px-2 py-1 rounded text-xs font-mono transition-colors flex items-center space-x-1 ${
+                  exploreMode === 'rover'
+                    ? 'bg-[#D97745] text-white font-bold shadow'
+                    : 'text-[#A6A8AD] hover:bg-[#22252c] hover:text-white'
+                }`}
+              >
+                <Truck className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Rover (15°)</span>
+                <span className="sm:hidden">Rover</span>
+              </button>
+              <button
+                onClick={() => {
+                  setExploreMode('astronaut');
+                  if (setMaxSlope) setMaxSlope(25);
+                  sfx.playBlip();
+                  if (startPoint && destinationPoint) handleComputeRouteWithSlope(25);
+                }}
+                title="Astronaut Mode (Human foot EVA 25° slope limit, 1.1 km/h)"
+                className={`px-2 py-1 rounded text-xs font-mono transition-colors flex items-center space-x-1 ${
+                  exploreMode === 'astronaut'
+                    ? 'bg-sky-500 text-black font-bold shadow'
+                    : 'text-[#A6A8AD] hover:bg-[#22252c] hover:text-white'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Astronaut (25°)</span>
+                <span className="sm:hidden">EVA</span>
+              </button>
+            </div>
+
             {/* Slope Tolerance Selector */}
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg px-2.5 py-1.5 text-xs font-mono shadow-xl hidden sm:flex items-center space-x-1.5">
-              <span className="text-[10px] text-[#A6A8AD] uppercase">Max Slope:</span>
+            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg px-2.5 py-1.5 text-xs font-mono shadow-xl hidden md:flex items-center space-x-1.5">
+              <span className="text-[10px] text-[#A6A8AD] uppercase">Limit:</span>
               {[15, 20, 25].map(deg => (
                 <button
                   key={deg}
                   onClick={() => {
                     if (setMaxSlope) setMaxSlope(deg);
                     sfx.playBlip();
-                    if (routeData) setRouteData(null);
+                    if (startPoint && destinationPoint) handleComputeRouteWithSlope(deg);
                   }}
                   title={`Set max allowable slope to ${deg}°`}
                   className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
@@ -759,7 +908,7 @@ export default function MarsMap({
               </select>
             </div>
 
-            {/* Tactical Grid & Audio Toggle */}
+            {/* Tactical Grid, Audio, Measure Tool & Mission Guide */}
             <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-1 flex items-center space-x-1 shadow-lg">
               <button
                 onClick={() => { setShowGraticule(!showGraticule); sfx.playBlip(); }}
@@ -772,6 +921,31 @@ export default function MarsMap({
               >
                 <Grid className="w-3.5 h-3.5" />
                 <span className="text-[10px]">Grid [G]</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsMeasureMode(!isMeasureMode);
+                  setMeasurePoints([]);
+                  sfx.playBlip();
+                }}
+                title="Measure distance & elevation difference between two points on terrain"
+                className={`px-2 py-1 rounded text-xs font-mono flex items-center space-x-1 transition-colors ${
+                  isMeasureMode
+                    ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                    : 'text-[#A6A8AD] hover:text-white hover:bg-[#22252c]'
+                }`}
+              >
+                <Ruler className="w-3.5 h-3.5" />
+                <span className="text-[10px]">Ruler</span>
+              </button>
+
+              <button
+                onClick={() => { setShowGuideModal(true); sfx.playBlip(); }}
+                title="Mission Quick Guide & Shortcuts (?)"
+                className="p-1 rounded text-[#A6A8AD] hover:text-sky-300 hover:bg-[#22252c] transition-colors"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
               </button>
 
               <button
@@ -802,12 +976,14 @@ export default function MarsMap({
             )}
           </div>
 
-          {/* EVA Traverse Simulator Controls (Active when route computed) */}
+          {/* EVA / Rover Traverse Simulator & Comparison Controls */}
           {routeData && (
             <div className="bg-[#191b20]/95 backdrop-blur-md border border-sky-500/40 rounded-lg p-1 px-2 flex items-center space-x-2 shadow-2xl pointer-events-auto">
               <div className="flex items-center space-x-1.5 pr-1 border-r border-[#33363D]">
                 <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
-                <span className="text-[10px] font-mono font-bold text-sky-400">EVA SIM:</span>
+                <span className="text-[10px] font-mono font-bold text-sky-400">
+                  {exploreMode === 'rover' ? 'ROVER SIM:' : 'EVA SIM:'}
+                </span>
               </div>
 
               {/* Play / Pause button */}
@@ -837,7 +1013,7 @@ export default function MarsMap({
                   setSimState(prev => ({ ...prev, isPlaying: false, stepIndex: 0 }));
                   sfx.playBlip();
                 }}
-                title="Rewind EVA Traverse"
+                title="Rewind Traverse"
                 className="p-1 rounded text-[#A6A8AD] hover:text-white hover:bg-[#22252c] transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -859,6 +1035,20 @@ export default function MarsMap({
               <span className="text-[10px] font-mono text-white">
                 {((simState.stepIndex / (routeData.route.length - 1)) * 100).toFixed(0)}%
               </span>
+
+              {/* Shortest Route Comparison toggle */}
+              <button
+                onClick={() => { setShowShortestComparison(!showShortestComparison); sfx.playBlip(); }}
+                title="Toggle display of direct Shortest Path vs Safest A* route on map"
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono border transition-colors flex items-center space-x-1 ml-1 ${
+                  showShortestComparison
+                    ? 'bg-slate-700/80 text-white border-slate-500 font-bold'
+                    : 'bg-[#14161a] text-[#A6A8AD] border-[#33363D] hover:text-white'
+                }`}
+              >
+                <span className="w-2.5 h-0.5 border-t border-dashed border-gray-300"></span>
+                <span>Shortest: {showShortestComparison ? 'ON' : 'OFF'}</span>
+              </button>
 
               {/* Mission Dossier Modal Trigger */}
               <button
@@ -1173,6 +1363,40 @@ export default function MarsMap({
 
         {/* Dedicated Route Pane with High Z-Index so it is ALWAYS rendered on top of imagery & geology */}
         <Pane name="routePane" style={{ zIndex: 620 }}>
+          {/* Direct Shortest Route Polyline (Dashed Gray) — Demonstrates why Safest A* route is necessary */}
+          {showShortestComparison && routeData?.shortest_route && routeData.shortest_route.length > 1 && (
+            <Polyline
+              positions={routeData.shortest_route.map(p => [p.lat, p.lng])}
+              pane="routePane"
+              pathOptions={{
+                color: '#9CA3AF',
+                weight: 3.5,
+                opacity: 0.85,
+                dashArray: '6, 6'
+              }}
+            >
+              <Tooltip sticky direction="top" opacity={0.95}>
+                <span className="font-mono text-[10px] text-gray-200">
+                  Direct Shortest: {routeData.shortest_distance_km} km (Crosses {routeData.shortest_max_slope_deg}° Scarp!)
+                </span>
+              </Tooltip>
+            </Polyline>
+          )}
+
+          {/* Active Measure Tool Polyline */}
+          {measurePoints.length === 2 && (
+            <Polyline
+              positions={measurePoints.map(p => [p.lat, p.lng])}
+              pane="routePane"
+              pathOptions={{
+                color: '#F59E0B',
+                weight: 3,
+                dashArray: '5, 5',
+                opacity: 0.95
+              }}
+            />
+          )}
+
           {/* Slope-Colored Trajectory Polyline (Green <=8°, Amber 8-15°, Red >15°) */}
           {slopeSegments.length > 0 && (
             <>
@@ -1205,6 +1429,52 @@ export default function MarsMap({
 
         {/* Dedicated Waypoint Pane with Highest Z-Index */}
         <Pane name="waypointPane" style={{ zIndex: 650 }}>
+          {/* Steepest Segment Warning Marker on Route */}
+          {steepestSegment && (
+            <Marker
+              position={[steepestSegment.lat, steepestSegment.lng]}
+              pane="waypointPane"
+              icon={L.divIcon({
+                className: 'peak-slope-badge',
+                html: `<div style="background:${steepestSegment.isHazard ? '#EF4444' : '#F59E0B'}; color:#fff; font-family:monospace; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px; border:1px solid #fff; box-shadow:0 0 10px rgba(239,68,68,0.85); white-space:nowrap; display:flex; align-items:center; gap:3px;">
+                  <span>▲</span> PEAK: ${steepestSegment.slope}° @ km ${steepestSegment.km}
+                </div>`,
+                iconSize: [150, 20],
+                iconAnchor: [75, 24]
+              })}
+            >
+              <Popup>
+                <div className="p-1 font-mono text-xs space-y-1">
+                  <div className="font-bold text-rose-400">STEEPEST TERRAIN SECTION</div>
+                  <div>Slope Incline: <strong>{steepestSegment.slope}°</strong></div>
+                  <div>Distance from Origin: <strong>{steepestSegment.km} km</strong></div>
+                  <div>Elevation: <strong>{steepestSegment.elevation?.toFixed(0)} m</strong></div>
+                  <div className="text-[10px] text-[#A6A8AD] border-t border-[#33363D] pt-1">
+                    {steepestSegment.isHazard 
+                      ? '⚠️ Exceeds slope threshold! A* steered around scarp.' 
+                      : '✓ Within safe slope threshold.'}
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          )}
+
+          {/* Active Measure Tool Waypoint Dots */}
+          {measurePoints.map((pt, idx) => (
+            <CircleMarker
+              key={`measure-pt-${idx}`}
+              center={[pt.lat, pt.lng]}
+              pane="waypointPane"
+              radius={6}
+              pathOptions={{
+                color: '#FFFFFF',
+                weight: 2,
+                fillColor: idx === 0 ? '#10B981' : '#F59E0B',
+                fillOpacity: 1.0
+              }}
+            />
+          ))}
+
           {/* Start Point Marker (Draggable) */}
           {startPoint && (
             <Marker 
@@ -1289,6 +1559,70 @@ export default function MarsMap({
         </Pane>
       </MapContainer>
 
+      {/* Feature 4: "What does this route cross?" Geology Crossings Card on Map */}
+      {routeData && geologyCrossings && geologyCrossings.length > 0 && (
+        <div className="absolute top-28 right-3 z-[1000] pointer-events-auto bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-2.5 shadow-2xl max-w-xs animate-in fade-in duration-300">
+          <div className="flex items-center justify-between pb-1.5 border-b border-[#33363D] mb-1.5">
+            <div className="flex items-center space-x-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+              <span className="text-[10px] font-mono font-bold text-[#F3F3F3] uppercase tracking-wider">Geology Crossings</span>
+            </div>
+            <span className="text-[9px] font-mono text-[#A6A8AD]">USGS SIM 3464</span>
+          </div>
+          {/* Multi-segment colored progress bar */}
+          <div className="w-full h-2 rounded-full overflow-hidden flex bg-[#101114] mb-2 border border-[#33363D]">
+            {geologyCrossings.map((g, idx) => (
+              <div
+                key={`bar-${idx}`}
+                style={{ width: `${g.pct}%`, backgroundColor: g.color }}
+                title={`${g.name}: ${g.pct}%`}
+              />
+            ))}
+          </div>
+          {/* Percentage breakdown list */}
+          <div className="space-y-1">
+            {geologyCrossings.map((g, idx) => (
+              <div key={`item-${idx}`} className="flex items-center justify-between text-[10px] font-mono">
+                <div className="flex items-center space-x-1.5 truncate pr-2">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: g.color }}></span>
+                  <span className="text-[#A6A8AD] truncate">{g.name}</span>
+                </div>
+                <span className="text-[#F3F3F3] font-bold">{g.pct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Active Measurement Floating Status Banner */}
+      {isMeasureMode && (
+        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-[1000] bg-[#191b20]/95 backdrop-blur-md border border-amber-500/50 rounded-lg px-3 py-2 shadow-2xl flex items-center space-x-3 text-xs font-mono animate-in fade-in duration-200">
+          <Ruler className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <div className="text-white">
+            {measurePoints.length === 0 && 'Click first point on terrain to start measurement.'}
+            {measurePoints.length === 1 && 'Click second point to measure distance and elevation difference.'}
+            {measurePoints.length === 2 && measureResult && (
+              <div className="flex items-center space-x-2">
+                <span>Distance: <strong className="text-amber-400">{measureResult.distKm} km ({measureResult.distM}m)</strong></span>
+                {measureResult.deltaElev != null && (
+                  <span className="pl-2 border-l border-[#33363D]">
+                    Δ Elev: <strong className={measureResult.deltaElev >= 0 ? 'text-emerald-400' : 'text-sky-400'}>
+                      {measureResult.deltaElev >= 0 ? `+${measureResult.deltaElev}` : measureResult.deltaElev} m
+                    </strong>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => { setIsMeasureMode(false); setMeasurePoints([]); }}
+            className="text-[#A6A8AD] hover:text-white ml-2 text-[10px] px-2 py-0.5 rounded bg-[#22252c] border border-[#33363D] transition-colors"
+          >
+            EXIT
+          </button>
+        </div>
+      )}
+
       {/* USGS Geology Legend (Active when USGS Geology is ON) */}
       <GeologyLegendBar showGeology={showGeology} hasActiveRoute={!!routeData} />
 
@@ -1354,6 +1688,77 @@ export default function MarsMap({
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Mission Guide Modal */}
+      {showGuideModal && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#191b20] border border-[#33363D] rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl font-mono">
+            <div className="flex items-center justify-between border-b border-[#33363D] pb-3">
+              <div className="flex items-center space-x-2">
+                <HelpCircle className="w-5 h-5 text-[#D97745]" />
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Astro-nah Mission Guide</h3>
+              </div>
+              <button
+                onClick={() => setShowGuideModal(false)}
+                className="text-[#A6A8AD] hover:text-white p-1 rounded hover:bg-[#22252c]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs leading-relaxed">
+              <div className="p-3 rounded-lg bg-[#101114] border border-[#33363D] space-y-1">
+                <div className="flex items-center space-x-2 text-emerald-400 font-bold">
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-[10px]">STEP 1</span>
+                  <span>Select Route or Presets</span>
+                </div>
+                <p className="text-[#A6A8AD] text-[11px]">
+                  Pick one of 5 authentic Perseverance milestones (e.g., Landing Site → Kodiak Butte), or click any 2 points on the Jezero Delta.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-lg bg-[#101114] border border-[#33363D] space-y-1">
+                <div className="flex items-center space-x-2 text-[#D97745] font-bold">
+                  <span className="px-1.5 py-0.5 rounded bg-[#D97745]/20 text-[10px]">STEP 2</span>
+                  <span>Compare Rover vs Astronaut &amp; Safest vs Shortest</span>
+                </div>
+                <p className="text-[#A6A8AD] text-[11px]">
+                  Toggle Rover mode (15° limit) vs Astronaut mode (25° limit). Observe how A* navigates around &gt;20° scarps while the direct shortest path crosses dangerous drop-offs.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-lg bg-[#101114] border border-[#33363D] space-y-1">
+                <div className="flex items-center space-x-2 text-sky-400 font-bold">
+                  <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-[10px]">STEP 3</span>
+                  <span>Inspect 25cm Micro-Terrain &amp; Export</span>
+                </div>
+                <p className="text-[#A6A8AD] text-[11px]">
+                  Open the 25cm Lens to view boulders from the 9.1GB HiRISE GeoTIFF, simulate the traverse with live telemetry, and export GeoJSON/CSV.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-[#33363D]">
+                <div className="text-[10px] text-[#A6A8AD] uppercase font-bold mb-1.5">Keyboard Shortcuts:</div>
+                <div className="grid grid-cols-2 gap-1 text-[10px] text-[#F3F3F3]">
+                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">Space</kbd> Play / Pause Sim</div>
+                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">R</kbd> Reset Waypoints</div>
+                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">D</kbd> Mission Dossier</div>
+                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">G</kbd> Tactical Grid</div>
+                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">F</kbd> Fullscreen Ops</div>
+                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">?</kbd> Open Guide</div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowGuideModal(false)}
+              className="w-full bg-[#D97745] hover:bg-[#B85C38] text-white py-2 rounded-lg font-bold text-xs transition-colors"
+            >
+              GOT IT — EXPLORE JEZERO
+            </button>
           </div>
         </div>
       )}

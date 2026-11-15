@@ -63,6 +63,9 @@ class RouteResponse(BaseModel):
     estimated_traverse_time_hours: Optional[float] = None
     direct_distance_km: Optional[float] = None
     direct_max_slope_deg: Optional[float] = None
+    shortest_route: Optional[List[Dict[str, Any]]] = None
+    shortest_distance_km: Optional[float] = None
+    shortest_max_slope_deg: Optional[float] = None
     hazard_warning: Optional[str] = None
     assumptions: List[str] = Field(default_factory=list)
 

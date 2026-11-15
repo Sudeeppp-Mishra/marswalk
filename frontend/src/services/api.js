@@ -276,13 +276,31 @@ function generateClientFallbackRoute(start, destination, maxSlopeDeg = 20.0) {
     });
   }
 
+  const shortestWaypoints = [];
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps;
+    const lat = start.lat + (destination.lat - start.lat) * f;
+    const lng = start.lng + (destination.lng - start.lng) * f;
+    const elev = baseElevStart + (baseElevDest - baseElevStart) * f;
+    const slope = (f >= 0.45 && f <= 0.6) ? 26.8 : 5.8;
+    shortestWaypoints.push({
+      lat: parseFloat(lat.toFixed(5)),
+      lng: parseFloat(lng.toFixed(5)),
+      elevation_m: parseFloat(elev.toFixed(1)),
+      slope_deg: parseFloat(slope.toFixed(1))
+    });
+  }
+
   return {
     status: 'success',
     route: waypoints,
+    shortest_route: shortestWaypoints,
+    shortest_distance_km: parseFloat((distKm * 0.91).toFixed(2)),
+    shortest_max_slope_deg: 26.8,
     distance_meters: Math.round(distM),
     distance_km: distKm,
-    direct_distance_km: distKm,
-    direct_max_slope_deg: 24.5,
+    direct_distance_km: parseFloat((distKm * 0.91).toFixed(2)),
+    direct_max_slope_deg: 26.8,
     elevation_gain_m: Math.max(10, Math.round(baseElevDest - baseElevStart + 15)),
     elevation_loss_m: Math.max(8, Math.round(baseElevStart - baseElevDest + 12)),
     max_slope_deg: 7.4,

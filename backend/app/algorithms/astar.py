@@ -53,7 +53,8 @@ class AStarPlanner:
     def find_path(
         self,
         start_rc: Tuple[int, int],
-        dest_rc: Tuple[int, int]
+        dest_rc: Tuple[int, int],
+        ignore_slope_penalty: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
         Executes A* search between start_rc (row, col) and dest_rc (row, col).
@@ -116,20 +117,23 @@ class AStarPlanner:
                 next_slope = self.slope[nr, nc]
 
                 # Terrain traversal cost formula
-                # Base step cost + slope penalty + uphill climb penalty
-                if next_slope <= 10.0:
-                    slope_penalty = 0.05 * next_slope
-                elif next_slope <= self.max_slope:
-                    # Steep nonlinear penalty for slopes between 10 deg and max_slope
-                    slope_penalty = 0.5 + 0.15 * (next_slope - 10.0)**2
+                if ignore_slope_penalty:
+                    # Pure Euclidean geometric distance (Shortest Path)
+                    step_cost = dist_step
                 else:
-                    # Steep scarp penalty: massive cost prevents entering unless no other path exists
-                    slope_penalty = 25.0 + 8.0 * (next_slope - self.max_slope)**2
+                    # Cost-aware traversal formula: distance + slope penalty + uphill climb penalty
+                    if next_slope <= 10.0:
+                        slope_penalty = 0.05 * next_slope
+                    elif next_slope <= self.max_slope:
+                        # Steep nonlinear penalty for slopes between 10 deg and max_slope
+                        slope_penalty = 0.5 + 0.15 * (next_slope - 10.0)**2
+                    else:
+                        # Steep scarp penalty: massive cost prevents entering unless no other path exists
+                        slope_penalty = 25.0 + 8.0 * (next_slope - self.max_slope)**2
 
-                elev_diff = next_elev - curr_elev
-                uphill_penalty = max(0.0, elev_diff) * self.climb_weight
-
-                step_cost = dist_step * (1.0 + slope_penalty) + uphill_penalty
+                    elev_diff = next_elev - curr_elev
+                    uphill_penalty = max(0.0, elev_diff) * self.climb_weight
+                    step_cost = dist_step * (1.0 + slope_penalty) + uphill_penalty
                 tentative_g = current_g + step_cost
 
                 if tentative_g < g_scores.get(neighbor, float('inf')):

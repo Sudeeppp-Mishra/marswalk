@@ -40,17 +40,16 @@ export default function MapLegendBar({ activeLayer }) {
               </div>
               <span>Threshold: 20°</span>
             </div>
-            {/* Slope gradient bar */}
-            <div 
-              className="h-2.5 w-full rounded border border-[#33363D]" 
-              style={{
-                background: 'linear-gradient(to right, #000004, #3b0f70, #8c2981, #de4968, #fe9f6d, #fcfdbf)'
-              }}
-            />
-            <div className="flex justify-between text-[9px]">
-              <span className="text-emerald-400">0° (Nominal)</span>
-              <span className="text-amber-400">10° (Caution)</span>
-              <span className="text-rose-400">20°+ (Hazard)</span>
+            {/* 3-Tier Slope Hazard Bar: Green (<10°), Amber (10°-20°), Red (>20°) */}
+            <div className="flex h-2.5 w-full rounded overflow-hidden border border-[#33363D]">
+              <div className="w-1/3 bg-emerald-500" title="0°-10° Safe / Nominal" />
+              <div className="w-1/3 bg-amber-500" title="10°-20° Caution / Moderate" />
+              <div className="w-1/3 bg-rose-600" title=">20° Impassable Hazard" />
+            </div>
+            <div className="flex justify-between text-[9px] font-mono">
+              <span className="text-emerald-400">&lt;10° Safe</span>
+              <span className="text-amber-400">10°–20° Caution</span>
+              <span className="text-rose-400">&gt;20° Hazard</span>
             </div>
           </>
         )}

@@ -160,15 +160,25 @@ class TerrainProcessor:
             elev_img = Image.fromarray((elev_rgba * 255).astype(np.uint8))
             elev_img.save(elev_out, "PNG", optimize=True)
 
-        # 2. Slope Hazard Color Overlay (Magma)
+        # 2. Slope Hazard Color Overlay (Tiered Green / Amber / Red RGBA)
         slope_out = PROCESSED_DATA_DIR / "jezero_slope_overlay.png"
         if not slope_out.exists():
-            norm_slope = np.clip(self._slope / 30.0, 0, 1)
-            slope_rgba = cm.magma(norm_slope)
-            slope_rgba[np.isnan(self._slope)] = [0, 0, 0, 0]
-            slope_rgba[:, :, 3] = np.where(np.isnan(self._slope), 0, 0.75)
-            
-            slope_img = Image.fromarray((slope_rgba * 255).astype(np.uint8))
+            h, w = self._slope.shape
+            slope_rgba = np.zeros((h, w, 4), dtype=np.uint8)
+
+            valid = ~np.isnan(self._slope)
+            green_mask = valid & (self._slope <= 10.0)
+            yellow_mask = valid & (self._slope > 10.0) & (self._slope <= 20.0)
+            red_mask = valid & (self._slope > 20.0)
+
+            # Green <=10°: Nominal traversal
+            slope_rgba[green_mask] = [16, 185, 129, 85]
+            # Amber 10°-20°: Moderate incline caution
+            slope_rgba[yellow_mask] = [245, 158, 11, 140]
+            # Red >20°: Impassable scarp hazard
+            slope_rgba[red_mask] = [239, 68, 68, 205]
+
+            slope_img = Image.fromarray(slope_rgba)
             slope_img.save(slope_out, "PNG", optimize=True)
 
         # 3. Local CTX overlay
@@ -251,6 +261,23 @@ class TerrainProcessor:
                 "slope_deg": round(slope, 1)
             })
 
+        # Run A* a second time with distance-only to compute the Shortest Path for comparison
+        shortest_result = planner.find_path(start_rc, dest_rc, ignore_slope_penalty=True)
+        shortest_coords = []
+        if shortest_result and "path_rc" in shortest_result:
+            for row, col in shortest_result["path_rc"]:
+                x, y = self._transform * (col, row)
+                lon = float(np.degrees(x / r))
+                lat = float(np.degrees(y / r))
+                elev = float(self._elevation[row, col])
+                slope = float(self._slope[row, col])
+                shortest_coords.append({
+                    "lat": round(lat, 5),
+                    "lng": round(lon, 5),
+                    "elevation_m": round(elev, 1),
+                    "slope_deg": round(slope, 1)
+                })
+
         return {
             "status": "success",
             "route": coordinates,
@@ -266,6 +293,9 @@ class TerrainProcessor:
             "estimated_traverse_time_hours": result.get("estimated_traverse_time_hours"),
             "direct_distance_km": result.get("direct_distance_km"),
             "direct_max_slope_deg": result.get("direct_max_slope_deg"),
+            "shortest_route": shortest_coords if shortest_coords else None,
+            "shortest_distance_km": shortest_result.get("distance_km") if shortest_result and "distance_km" in shortest_result else None,
+            "shortest_max_slope_deg": shortest_result.get("max_slope_deg") if shortest_result and "max_slope_deg" in shortest_result else None,
             "hazard_warning": result.get("hazard_warning"),
             "assumptions": result["assumptions"]
         }
@@ -302,13 +332,32 @@ class TerrainProcessor:
                 "slope_deg": round(float(slope), 1)
             })
 
+        # Direct shortest path crossing terrain directly
+        shortest_coords = []
+        for i in range(num_steps):
+            frac = i / (num_steps - 1)
+            lat = start_lat + (dest_lat - start_lat) * frac
+            lng = start_lng + (dest_lng - start_lng) * frac
+            elev = base_elev_start + (base_elev_dest - base_elev_start) * frac
+            # Crosses a steep cliff mid-way
+            slope = 26.5 if 0.4 <= frac <= 0.6 else 5.5
+            shortest_coords.append({
+                "lat": round(float(lat), 5),
+                "lng": round(float(lng), 5),
+                "elevation_m": round(float(elev), 1),
+                "slope_deg": round(float(slope), 1)
+            })
+
         return {
             "status": "success",
             "route": coordinates,
+            "shortest_route": shortest_coords,
+            "shortest_distance_km": round(dist_km * 0.92, 2),
+            "shortest_max_slope_deg": 26.5,
             "distance_meters": round(dist_m, 1),
             "distance_km": dist_km,
             "direct_distance_km": dist_km,
-            "direct_max_slope_deg": 24.5,
+            "direct_max_slope_deg": 26.5,
             "elevation_gain_m": round(max(0.0, base_elev_dest - base_elev_start) + 12.0, 1),
             "elevation_loss_m": round(max(0.0, base_elev_start - base_elev_dest) + 8.0, 1),
             "max_slope_deg": 7.2,
