@@ -15,7 +15,7 @@ export default function BottomBar({ cursorCoords, startPoint, destinationPoint }
           <span className="text-[#F3F3F3]">
             {cursorCoords.lat && cursorCoords.lng 
               ? `${cursorCoords.lat}° N, ${cursorCoords.lng}° E` 
-              : '18.3800° N, 77.5800° E'}
+              : '—'}
           </span>
         </div>
 
@@ -26,7 +26,7 @@ export default function BottomBar({ cursorCoords, startPoint, destinationPoint }
           <span className="text-[#F3F3F3] font-semibold">
             {hasElevation 
               ? `${cursorCoords.elevation.toLocaleString()} m (datum)` 
-              : '-2,628 m (datum)'}
+              : '—'}
           </span>
         </div>
 
@@ -41,7 +41,7 @@ export default function BottomBar({ cursorCoords, startPoint, destinationPoint }
                   : (cursorCoords.slope > 10 ? 'text-amber-400' : 'text-emerald-400'))
               : 'text-emerald-400'
           }`}>
-            {hasSlope ? `${cursorCoords.slope}°` : '1.99°'}
+            {hasSlope ? `${cursorCoords.slope}°` : '—'}
           </span>
           {cursorCoords.risk_tier && (
             <span className="text-[10px] text-[#A6A8AD]">({cursorCoords.risk_tier})</span>

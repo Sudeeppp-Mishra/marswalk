@@ -62,7 +62,7 @@ export default function Navigation({ activeTab, setActiveTab }) {
           <span className="text-[#F3F3F3]">Mars IAU 2000</span>
         </div>
         <div className="pt-2 text-[10px] text-[#A6A8AD]/70 text-center">
-          Prototype v0.1 • Hackathon Kickoff
+          Astro-nah v1.0 • NASA Space Apps 2026
         </div>
       </div>
     </aside>
