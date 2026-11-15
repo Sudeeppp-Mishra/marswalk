@@ -30,6 +30,15 @@ async def root():
         "health_check": "/api/health"
     }
 
+@app.get("/health")
+async def health_check_root():
+    """Root-level health check endpoint for cloud load balancers and frontends."""
+    return {
+        "status": "ok",
+        "project": PROJECT_NAME,
+        "version": PROJECT_VERSION
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

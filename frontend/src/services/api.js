@@ -1,4 +1,17 @@
-const BASE_URL = 'http://127.0.0.1:8000/api';
+// Normalize API base URL: handles trailing slashes, missing /api prefix, and environments
+const getNormalizedBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (!envUrl) {
+    return import.meta.env.PROD ? '/api' : 'http://127.0.0.1:8000/api';
+  }
+  let cleaned = envUrl.trim().replace(/\/+$/, '');
+  if (!cleaned.endsWith('/api') && cleaned !== '/api') {
+    cleaned = `${cleaned}/api`;
+  }
+  return cleaned;
+};
+
+const BASE_URL = getNormalizedBaseUrl();
 
 // Schematic fallback dataset for USGS Geology & Perseverance Observation Milestones
 // Approximate boundaries based on USGS SIM 3464 and Mars 2020 public science releases
