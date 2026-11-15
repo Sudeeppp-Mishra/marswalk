@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Compass, Radio, Clock, Maximize2, Minimize2 } from 'lucide-react';
+import { Compass, Radio, Clock, Maximize2, Minimize2, Presentation } from 'lucide-react';
 
 function useMarsClock() {
   const [marsTime, setMarsTime] = useState({ sol: 0, time: '--:--:--' });
@@ -109,6 +109,18 @@ export default function Header({ backendStatus, activeTab, destinationPoint, isT
             {isTacticalMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
         )}
+
+        {/* Official 7-Slide Presentation Deck */}
+        <a
+          href="/slides.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open official 7-Slide Presentation Deck in new tab"
+          className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded bg-[#D97745]/20 hover:bg-[#D97745]/30 text-[#D97745] border border-[#D97745]/40 transition-colors font-semibold text-[11px]"
+        >
+          <Presentation className="w-3.5 h-3.5" />
+          <span>7-SLIDE DECK</span>
+        </a>
 
         {/* NASA Challenge Badge */}
         <div className="hidden xl:flex items-center space-x-1.5 text-[#A6A8AD]">
