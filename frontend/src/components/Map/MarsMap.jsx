@@ -1803,6 +1803,8 @@ export default function MarsMap({
         routeData={routeData}
         startPoint={startPoint}
         destinationPoint={destinationPoint}
+        onSelectWaypoint={onSelectPoint}
+        onRouteComputed={(newRoute) => setRouteData(newRoute)}
       />
     </div>
   );
