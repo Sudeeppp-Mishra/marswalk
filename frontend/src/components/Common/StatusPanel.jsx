@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Activity, 
   Database, 
@@ -12,7 +12,9 @@ import {
   TrendingUp,
   Download,
   Calendar,
-  Layers
+  Layers,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { exportRouteAsGeoJSON, exportRouteAsCSV } from '../../utils/exportRoute';
 import { DEFAULT_GEOLOGY_DATA } from '../../services/api';
@@ -23,6 +25,7 @@ export default function StatusPanel({
   destinationPoint,
   routeData
 }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const roverHours = routeData ? (routeData.distance_km / 0.12).toFixed(1) : null;
   const evaHours = routeData ? ((routeData.distance_km / 1.1) * (1 + routeData.elevation_gain_m / 400)).toFixed(1) : null;
   const estimatedSols = routeData ? Math.max(1, Math.round(routeData.distance_km / 0.12)) : null;
@@ -89,12 +92,44 @@ export default function StatusPanel({
           : '0.0')
   ) : null;
 
+  if (isCollapsed) {
+    return (
+      <aside className="w-10 bg-[#14161a] border-l border-[#33363D] flex flex-col items-center py-3 select-none transition-all duration-200 z-[1100]">
+        <button
+          onClick={() => setIsCollapsed(false)}
+          title="Expand Mission Telemetry"
+          className="p-1.5 rounded hover:bg-[#22252c] text-[#A6A8AD] hover:text-white transition-colors mb-4"
+        >
+          <ChevronLeft className="w-4 h-4 text-[#D97745]" />
+        </button>
+        {routeData && (
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mb-3" title="Route Telemetry Active" />
+        )}
+        <div 
+          onClick={() => setIsCollapsed(false)}
+          className="cursor-pointer [writing-mode:vertical-lr] text-[10px] font-mono uppercase tracking-widest text-[#A6A8AD] hover:text-[#F3F3F3] transition-colors py-2"
+        >
+          Telemetry
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="w-80 bg-[#191b20] border-l border-[#33363D] flex flex-col justify-between overflow-y-auto select-none p-4 space-y-4">
+    <aside className="w-80 bg-[#14161a] border-l border-[#33363D] flex flex-col justify-between overflow-y-auto select-none p-4 space-y-4 transition-all duration-200 z-[1100]">
       {/* Target Mission Information */}
       <div className="space-y-3">
         <div className="flex items-center justify-between border-b border-[#33363D] pb-2">
-          <span className="text-xs font-mono uppercase text-[#A6A8AD]">Mission Target</span>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setIsCollapsed(true)}
+              title="Collapse Telemetry Sidebar"
+              className="p-1 rounded hover:bg-[#22252c] text-[#A6A8AD] hover:text-white transition-colors"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-xs font-mono uppercase text-[#A6A8AD]">Mission Target</span>
+          </div>
           <span className="text-xs font-mono text-[#D97745] font-semibold">JEZERO CRATER</span>
         </div>
 

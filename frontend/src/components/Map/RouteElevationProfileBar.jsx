@@ -7,7 +7,7 @@ export default function RouteElevationProfileBar({
   onLeavePoint,
   onJumpToStep 
 }) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [hoverInfo, setHoverInfo] = useState(null);
 
   if (!routeData || !routeData.route || routeData.route.length === 0) return null;

@@ -92,28 +92,28 @@ const TOUR_STEPS = [
 
 const TOUR_POSITIONS = {
   presets: {
-    container: 'top-[96px] left-3 sm:left-4',
-    arrow: 'top-[-8px] left-10 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+    container: 'top-16 left-3 sm:left-[28%]',
+    arrow: 'top-[-8px] left-12 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   mode_compute: {
-    container: 'top-16 right-3 sm:right-6',
-    arrow: 'top-[-8px] right-20 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+    container: 'top-16 left-3 sm:left-[36%]',
+    arrow: 'top-[-8px] left-16 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   layers: {
-    container: 'top-16 left-3 sm:left-24 md:left-40',
-    arrow: 'top-[-8px] left-24 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+    container: 'top-16 left-3 sm:left-4',
+    arrow: 'top-[-8px] left-16 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   comparison_geology: {
-    container: 'top-20 right-3 sm:right-6',
+    container: 'top-16 right-3 sm:right-6',
     arrow: 'top-[-8px] right-8 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   micro_3d: {
-    container: 'top-16 left-3 sm:left-16 md:left-28',
-    arrow: 'top-[-8px] left-20 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+    container: 'top-16 left-3 sm:left-24',
+    arrow: 'top-[-8px] left-16 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   simulation_export: {
-    container: 'top-[96px] right-3 sm:right-6',
-    arrow: 'top-[-8px] right-24 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+    container: 'top-16 left-3 sm:left-[42%]',
+    arrow: 'top-[-8px] left-16 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   }
 };
 

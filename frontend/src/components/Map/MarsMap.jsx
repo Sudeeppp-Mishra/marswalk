@@ -715,346 +715,201 @@ export default function MarsMap({
 
   return (
     <div className="relative w-full h-full bg-[#101114] overflow-hidden flex flex-col">
-      {/* Top Map HUD Bar - Responsive aerospace layout */}
-      <div className="absolute top-3 left-3 right-3 z-[1000] pointer-events-none flex flex-col gap-2">
-        {/* Row 1: Left controls (Layers & Science) + Right controls (Waypoints & Action) */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Left Group: Layers and Science Overlays */}
-          <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
-            {/* Layer Selector */}
-            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 flex items-center space-x-1 shadow-xl">
-              <button
-                onClick={() => { setActiveLayer('ctx'); sfx.playBlip(); }}
-                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
-                  activeLayer === 'ctx'
-                    ? 'bg-[#D97745] text-white font-medium shadow-md'
-                    : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-                }`}
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>CTX (6m)</span>
-              </button>
-              <button
-                onClick={() => { setActiveLayer('hirise'); sfx.playBlip(); }}
-                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
-                  activeLayer === 'hirise'
-                    ? 'bg-[#D97745] text-white font-medium shadow-md'
-                    : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-                }`}
-              >
-                <Scan className="w-3.5 h-3.5 text-sky-400" />
-                <span>HiRISE (25cm)</span>
-              </button>
-              <button
-                onClick={() => { setIsHiRISEInspectorOpen(true); sfx.playBlip(); }}
-                title="Inspect authentic 25cm/px micro-terrain from local 9.1GB GeoTIFF"
-                className={`px-2 py-1 rounded text-xs font-mono transition-all flex items-center space-x-1 bg-purple-950/50 hover:bg-purple-900/70 text-purple-300 border border-purple-500/50 shadow-md ml-0.5 ${
-                  activeGuideStep === 5 ? 'ring-2 ring-purple-400 shadow-purple-500/50 scale-105' : ''
-                }`}
-              >
-                <Scan className="w-3 h-3 text-purple-400 animate-pulse" />
-                <span className="font-semibold text-[11px]">25cm Lens</span>
-              </button>
-              <button
-                onClick={() => { setIs3DModalOpen(true); sfx.playBlip(); }}
-                title="Launch Interactive 3D WebGL Terrain Orbit (Mesh derived from 20m DTM)"
-                className={`px-2 py-1 rounded text-xs font-mono transition-all flex items-center space-x-1 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-500/50 shadow-md ml-0.5 ${
-                  activeGuideStep === 5 ? 'ring-2 ring-emerald-400 shadow-emerald-500/50 scale-105' : ''
-                }`}
-              >
-                <Box className="w-3 h-3 text-emerald-400 animate-pulse" />
-                <span className="font-semibold text-[11px]">3D Orbit</span>
-              </button>
-              <button
-                onClick={() => { setActiveLayer('elevation'); sfx.playBlip(); }}
-                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
-                  activeLayer === 'elevation'
-                    ? 'bg-[#D97745] text-white font-medium shadow-md'
-                    : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-                }`}
-              >
-                <span>Elevation DEM</span>
-              </button>
-              <button
-                onClick={() => { setActiveLayer('slope'); sfx.playBlip(); }}
-                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-all flex items-center space-x-1.5 ${
-                  activeLayer === 'slope'
-                    ? 'bg-[#D97745] text-white font-medium shadow-md'
-                    : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-                } ${activeGuideStep === 3 ? 'ring-2 ring-amber-400 shadow-amber-500/50 scale-105' : ''}`}
-              >
-                <span>Slope Hazard</span>
-              </button>
-              <span
-                className="px-2.5 py-1.5 rounded text-xs font-mono text-[#555] cursor-default select-none"
-                title="Global Viking MDIM2.1 (232m/px) — disabled for Jezero-focused mission"
-              >
-                Global Base <span className="text-[9px] text-[#444]">Roadmap</span>
-              </span>
-            </div>
-
-            {/* Science Overlays Toggles */}
-            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 flex items-center space-x-1 shadow-xl">
-              <button
-                onClick={() => { setShowGeology(!showGeology); sfx.playBlip(); }}
-                className={`px-2.5 py-1.5 rounded text-[11px] font-mono border transition-colors flex items-center space-x-1.5 ${
-                  showGeology 
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 font-semibold' 
-                    : 'bg-transparent text-[#A6A8AD] border-transparent hover:bg-[#22252c] hover:text-[#F3F3F3]'
-                }`}
-              >
-                <span>USGS Geology</span>
-                <span className={`text-[9px] px-1 rounded ${showGeology ? 'bg-amber-500 text-black font-bold' : 'bg-[#101114]'}`}>
-                  {showGeology ? 'ON' : 'OFF'}
-                </span>
-              </button>
-
-              <button
-                onClick={() => { setShowObservations(!showObservations); sfx.playBlip(); }}
-                className={`px-2.5 py-1.5 rounded text-[11px] font-mono border transition-colors flex items-center space-x-1.5 ${
-                  showObservations 
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/60 font-semibold' 
-                    : 'bg-transparent text-[#A6A8AD] border-transparent hover:bg-[#22252c] hover:text-[#F3F3F3]'
-                }`}
-              >
-                <span>Rover Sols</span>
-                <span className={`text-[9px] px-1 rounded ${showObservations ? 'bg-sky-400 text-black font-bold' : 'bg-[#101114]'}`}>
-                  {showObservations ? 'ON' : 'OFF'}
-                </span>
-              </button>
-            </div>
+      {/* Top Map Command Bar - Spacious, Unified, Single Aerospace HUD Bar */}
+      <div className="absolute top-3 left-3 right-3 z-[1000] pointer-events-none flex flex-wrap items-center justify-between gap-2 font-mono">
+        {/* Left Section: Layers & Science Overlays */}
+        <div className="flex items-center gap-1.5 pointer-events-auto bg-[#14161a]/85 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 shadow-xl">
+          {/* Segmented Layer Switch */}
+          <div className="flex items-center space-x-0.5 bg-[#101114]/80 rounded p-0.5 border border-[#33363D]/60">
+            <button
+              onClick={() => { setActiveLayer('ctx'); sfx.playBlip(); }}
+              className={`px-2 py-1 rounded text-[11px] transition-colors flex items-center space-x-1 ${
+                activeLayer === 'ctx'
+                  ? 'bg-[#D97745] text-white font-medium shadow'
+                  : 'text-[#A6A8AD] hover:text-white hover:bg-[#22252c]'
+              }`}
+            >
+              <Eye className="w-3 h-3" />
+              <span>CTX</span>
+            </button>
+            <button
+              onClick={() => { setActiveLayer('hirise'); sfx.playBlip(); }}
+              className={`px-2 py-1 rounded text-[11px] transition-colors flex items-center space-x-1 ${
+                activeLayer === 'hirise'
+                  ? 'bg-[#D97745] text-white font-medium shadow'
+                  : 'text-[#A6A8AD] hover:text-white hover:bg-[#22252c]'
+              }`}
+            >
+              <Scan className="w-3 h-3 text-sky-400" />
+              <span>HiRISE</span>
+            </button>
+            <button
+              onClick={() => { setActiveLayer('elevation'); sfx.playBlip(); }}
+              className={`px-2 py-1 rounded text-[11px] transition-colors flex items-center space-x-1 ${
+                activeLayer === 'elevation'
+                  ? 'bg-[#D97745] text-white font-medium shadow'
+                  : 'text-[#A6A8AD] hover:text-white hover:bg-[#22252c]'
+              }`}
+            >
+              <span>DEM</span>
+            </button>
+            <button
+              onClick={() => { setActiveLayer('slope'); sfx.playBlip(); }}
+              className={`px-2 py-1 rounded text-[11px] transition-all flex items-center space-x-1 ${
+                activeLayer === 'slope'
+                  ? 'bg-[#D97745] text-white font-medium shadow'
+                  : 'text-[#A6A8AD] hover:text-white hover:bg-[#22252c]'
+              } ${activeGuideStep === 3 ? 'ring-2 ring-amber-400 shadow-amber-500/50 scale-105' : ''}`}
+            >
+              <span>Slope</span>
+            </button>
           </div>
 
-          {/* Right Group: Mode Selector, Waypoints, Slope Limit, Reset & Route Action */}
-          <div className="flex items-center gap-2 pointer-events-auto ml-auto">
-            {/* Rover Mode vs Astronaut Mode Segmented Switch */}
-            <div className={`bg-[#14161a]/80 backdrop-blur-md border rounded-lg p-0.5 flex items-center space-x-1 shadow-xl transition-all ${
-              activeGuideStep === 2 ? 'border-[#D97745] ring-2 ring-[#D97745]/80 shadow-orange-500/30' : 'border-[#33363D]/80'
-            }`}>
-              <button
-                onClick={() => {
-                  setExploreMode('rover');
-                  if (setMaxSlope) setMaxSlope(15);
-                  sfx.playBlip();
-                  if (startPoint && destinationPoint) handleComputeRouteWithSlope(15);
-                }}
-                title="Rover Mode (Perseverance 15° vehicle slope limit, 0.12 km/h)"
-                className={`px-2 py-1 rounded text-xs font-mono transition-colors flex items-center space-x-1 ${
-                  exploreMode === 'rover'
-                    ? 'bg-[#D97745] text-white font-bold shadow'
-                    : 'text-[#A6A8AD] hover:bg-[#22252c] hover:text-white'
-                }`}
-              >
-                <Truck className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Rover (15°)</span>
-                <span className="sm:hidden">Rover</span>
-              </button>
-              <button
-                onClick={() => {
-                  setExploreMode('astronaut');
-                  if (setMaxSlope) setMaxSlope(25);
-                  sfx.playBlip();
-                  if (startPoint && destinationPoint) handleComputeRouteWithSlope(25);
-                }}
-                title="Astronaut Mode (Human foot EVA 25° slope limit, 1.1 km/h)"
-                className={`px-2 py-1 rounded text-xs font-mono transition-colors flex items-center space-x-1 ${
-                  exploreMode === 'astronaut'
-                    ? 'bg-sky-500 text-black font-bold shadow'
-                    : 'text-[#A6A8AD] hover:bg-[#22252c] hover:text-white'
-                }`}
-              >
-                <User className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Astronaut (25°)</span>
-                <span className="sm:hidden">EVA</span>
-              </button>
-            </div>
+          <div className="w-[1px] h-4 bg-[#33363D]/60 mx-0.5 hidden sm:block" />
 
-            {/* Slope Tolerance Selector */}
-            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg px-2.5 py-1.5 text-xs font-mono shadow-xl hidden md:flex items-center space-x-1.5">
-              <span className="text-[10px] text-[#A6A8AD] uppercase">Limit:</span>
-              {[15, 20, 25].map(deg => (
+          {/* 3D Orbit & 25cm Micro Lens */}
+          <button
+            onClick={() => { setIs3DModalOpen(true); sfx.playBlip(); }}
+            title="Launch Interactive 3D WebGL Terrain Orbit"
+            className={`px-2 py-1 rounded text-[11px] transition-all flex items-center space-x-1 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 ${
+              activeGuideStep === 5 ? 'ring-2 ring-emerald-400 shadow-emerald-500/50 scale-105' : ''
+            }`}
+          >
+            <Box className="w-3 h-3 text-emerald-400 animate-pulse" />
+            <span className="font-semibold">3D</span>
+          </button>
+
+          <button
+            onClick={() => { setIsHiRISEInspectorOpen(true); sfx.playBlip(); }}
+            title="Inspect authentic 25cm/px micro-terrain lens"
+            className={`px-2 py-1 rounded text-[11px] transition-all flex items-center space-x-1 bg-purple-950/40 hover:bg-purple-900/60 text-purple-300 border border-purple-500/40 ${
+              activeGuideStep === 5 ? 'ring-2 ring-purple-400 shadow-purple-500/50 scale-105' : ''
+            }`}
+          >
+            <Scan className="w-3 h-3 text-purple-400 animate-pulse" />
+            <span className="font-semibold hidden md:inline">25cm Lens</span>
+          </button>
+
+          <div className="w-[1px] h-4 bg-[#33363D]/60 mx-0.5 hidden sm:block" />
+
+          {/* Science Overlays: Geology & Sols */}
+          <button
+            onClick={() => { setShowGeology(!showGeology); sfx.playBlip(); }}
+            className={`px-2 py-1 rounded text-[10px] border transition-colors flex items-center space-x-1 ${
+              showGeology 
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 font-semibold' 
+                : 'bg-transparent text-[#A6A8AD] border-transparent hover:bg-[#22252c] hover:text-white'
+            }`}
+          >
+            <span>Geology</span>
+            <span className={`text-[8px] px-1 rounded ${showGeology ? 'bg-amber-500 text-black font-bold' : 'bg-[#101114]'}`}>
+              {showGeology ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          <button
+            onClick={() => { setShowObservations(!showObservations); sfx.playBlip(); }}
+            className={`px-2 py-1 rounded text-[10px] border transition-colors flex items-center space-x-1 ${
+              showObservations 
+                ? 'bg-sky-500/20 text-sky-300 border-sky-500/60 font-semibold' 
+                : 'bg-transparent text-[#A6A8AD] border-transparent hover:bg-[#22252c] hover:text-white'
+            }`}
+          >
+            <span>Sols</span>
+            <span className={`text-[8px] px-1 rounded ${showObservations ? 'bg-sky-400 text-black font-bold' : 'bg-[#101114]'}`}>
+              {showObservations ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          {/* Contextual Opacity Blend */}
+          {(activeLayer === 'slope' || activeLayer === 'elevation') && (
+            <div className="hidden lg:flex items-center space-x-1 pl-1 text-[10px]">
+              <span className="text-[#A6A8AD]">Blend:</span>
+              {[0.4, 0.7, 1.0].map((op) => (
                 <button
-                  key={deg}
-                  onClick={() => {
-                    if (setMaxSlope) setMaxSlope(deg);
-                    sfx.playBlip();
-                    if (startPoint && destinationPoint) handleComputeRouteWithSlope(deg);
-                  }}
-                  title={`Set max allowable slope to ${deg}°`}
-                  className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
-                    maxSlope === deg 
-                      ? 'bg-[#D97745] text-white font-bold shadow' 
-                      : 'text-[#A6A8AD] hover:bg-[#22252c] hover:text-white'
+                  key={op}
+                  onClick={() => { setOverlayOpacity(op); sfx.playBlip(); }}
+                  className={`px-1 py-0.5 rounded transition-colors ${
+                    overlayOpacity === op ? 'bg-[#D97745] text-white font-bold' : 'text-[#A6A8AD] hover:bg-[#22252c]'
                   }`}
                 >
-                  {deg}°
+                  {Math.round(op * 100)}%
                 </button>
               ))}
             </div>
-
-            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg px-3 py-1.5 text-xs font-mono shadow-xl flex items-center space-x-2.5">
-              <div className="flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                <span className="text-[#A6A8AD]">START:</span>
-                <span className="text-[#F3F3F3]">
-                  {startPoint ? `${startPoint.lat}°, ${startPoint.lng}°` : 'Click map'}
-                </span>
-              </div>
-              <div className="w-[1px] h-3.5 bg-[#33363D]"></div>
-              <div className="flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#D97745] inline-block animate-pulse"></span>
-                <span className="text-[#A6A8AD]">DEST:</span>
-                <span className="text-[#F3F3F3]">
-                  {destinationPoint ? `${destinationPoint.lat}°, ${destinationPoint.lng}°` : 'Click map'}
-                </span>
-              </div>
-
-              {(startPoint || destinationPoint || routeData) && (
-                <button
-                  onClick={handleResetPoints}
-                  title="Clear Waypoints & Route (R)"
-                  className="px-2 py-0.5 rounded bg-[#22252c] hover:bg-rose-950/50 text-[#A6A8AD] hover:text-rose-400 border border-[#33363D] transition-colors flex items-center space-x-1 ml-1 text-[10px]"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>RESET [R]</span>
-                </button>
-              )}
-
-              {startPoint && destinationPoint && (
-                <button
-                  onClick={handleShareMission}
-                  title="Copy Mission Dispatch Link to Clipboard"
-                  className="px-2 py-0.5 rounded bg-[#22252c] hover:bg-sky-950/50 text-[#A6A8AD] hover:text-sky-300 border border-[#33363D] transition-colors flex items-center space-x-1 text-[10px]"
-                >
-                  <Share2 className="w-3 h-3 text-sky-400" />
-                  <span>SHARE</span>
-                </button>
-              )}
-            </div>
-
-            {/* Compute Route Trigger */}
-            {startPoint && destinationPoint && !routeData && (
-              <button
-                onClick={handleComputeRoute}
-                disabled={isCalculating}
-                className={`bg-[#D97745] hover:bg-[#B85C38] text-white px-3.5 py-1.5 rounded-lg font-mono text-xs font-semibold shadow-xl flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap ${
-                  activeGuideStep === 2 ? 'ring-2 ring-orange-400 shadow-orange-500/50 scale-105 animate-pulse' : ''
-                }`}
-              >
-                <Play className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : ''}`} />
-                <span>{isCalculating ? 'COMPUTING...' : 'COMPUTE ROUTE'}</span>
-              </button>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Row 2: 5 Perseverance Presets, Tactical Controls & EVA Simulator HUD */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-          <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
-            {/* 5 Real Perseverance Mission Presets Dropdown */}
-            <div className={`bg-[#14161a]/80 backdrop-blur-md border rounded-lg p-1 flex items-center space-x-1.5 shadow-lg transition-all ${
-              activeGuideStep === 1 ? 'border-emerald-400 ring-2 ring-emerald-400/80 shadow-emerald-500/30' : 'border-[#33363D]/80'
-            }`}>
-              <Compass className="w-3.5 h-3.5 text-[#D97745] ml-1" />
-              <span className="text-[10px] font-mono uppercase text-[#A6A8AD] px-1">Presets:</span>
-              <select
-                onChange={(e) => {
-                  if (e.target.value) handleApplyPreset(e.target.value);
-                }}
-                defaultValue=""
-                className="bg-[#101114]/90 border border-[#33363D] text-[#F3F3F3] text-[11px] font-mono rounded px-2 py-1 outline-none hover:border-[#D97745] transition-colors cursor-pointer"
-              >
-                <option value="" disabled>Select Perseverance Milestone...</option>
-                <option value="perseverance_to_kodiak">1. Landing Site → Kodiak Butte Delta Remnant</option>
-                <option value="three_forks_to_wildcat">2. Three Forks Sample Depot → Wildcat Ridge</option>
-                <option value="seitah_traversal">3. South Séítah Outcrop → Artuby Ridge</option>
-                <option value="delta_top_ascent">4. Delta Scarp Ascent → Belva Crater Overlook</option>
-                <option value="neretva_vallis_inflow">5. Upper Delta Terrace → Neretva Canyon Inflow</option>
-              </select>
-            </div>
-
-            {/* Tactical Grid, Audio, Measure Tool & Mission Guide */}
-            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 flex items-center space-x-1 shadow-lg">
-              <button
-                onClick={() => { setShowGraticule(!showGraticule); sfx.playBlip(); }}
-                title="Toggle Tactical Martian Grid (G)"
-                className={`px-2 py-1 rounded text-xs font-mono flex items-center space-x-1 transition-colors ${
-                  showGraticule 
-                    ? 'bg-sky-500/20 text-sky-300 font-bold' 
-                    : 'text-[#A6A8AD] hover:text-white hover:bg-[#22252c]'
-                }`}
-              >
-                <Grid className="w-3.5 h-3.5" />
-                <span className="text-[10px]">Grid [G]</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsMeasureMode(!isMeasureMode);
-                  setMeasurePoints([]);
-                  sfx.playBlip();
-                }}
-                title="Measure distance & elevation difference between two points on terrain"
-                className={`px-2 py-1 rounded text-xs font-mono flex items-center space-x-1 transition-colors ${
-                  isMeasureMode
-                    ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
-                    : 'text-[#A6A8AD] hover:text-white hover:bg-[#22252c]'
-                }`}
-              >
-                <Ruler className="w-3.5 h-3.5" />
-                <span className="text-[10px]">Ruler</span>
-              </button>
-
-              <button
-                onClick={() => { setShowGuideModal(true); sfx.playBlip(); }}
-                title="Mission Quick Guide for Judges (1. Pick Preset, 2. Compute Route, 3. Export)"
-                className="px-2 py-1 rounded text-xs font-mono flex items-center space-x-1 bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-colors"
-              >
-                <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-[10px] font-bold">Guide</span>
-              </button>
-
-              <button
-                onClick={handleToggleMute}
-                title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
-                className="p-1.5 rounded text-[#A6A8AD] hover:text-white hover:bg-[#22252c] transition-colors"
-              >
-                {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5 text-emerald-400" />}
-              </button>
-            </div>
-
-            {/* Opacity selector when viewing hazard or elevation overlay */}
-            {(activeLayer === 'slope' || activeLayer === 'elevation') && (
-              <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 flex items-center space-x-1 shadow-lg text-[10px] font-mono">
-                <span className="text-[#A6A8AD] px-1">Blend:</span>
-                {[0.4, 0.7, 1.0].map((op) => (
-                  <button
-                    key={op}
-                    onClick={() => { setOverlayOpacity(op); sfx.playBlip(); }}
-                    className={`px-1.5 py-0.5 rounded transition-colors ${
-                      overlayOpacity === op ? 'bg-[#D97745] text-white font-bold' : 'text-[#A6A8AD] hover:bg-[#22252c]'
-                    }`}
-                  >
-                    {Math.round(op * 100)}%
-                  </button>
-                ))}
-              </div>
-            )}
+        {/* Center Section: Presets, Mode, Compute & Simulation Controls */}
+        <div className="flex items-center gap-1.5 pointer-events-auto bg-[#14161a]/85 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 shadow-xl">
+          {/* Milestone Presets Dropdown */}
+          <div className={`flex items-center space-x-1 px-1 rounded transition-all ${
+            activeGuideStep === 1 ? 'border border-emerald-400 ring-2 ring-emerald-400/80 shadow-emerald-500/30' : ''
+          }`}>
+            <Compass className="w-3.5 h-3.5 text-[#D97745]" />
+            <select
+              onChange={(e) => {
+                if (e.target.value) handleApplyPreset(e.target.value);
+              }}
+              defaultValue=""
+              className="bg-[#101114]/90 border border-[#33363D] text-[#F3F3F3] text-[11px] rounded px-2 py-1 outline-none hover:border-[#D97745] transition-colors cursor-pointer max-w-[170px] sm:max-w-[210px] truncate"
+            >
+              <option value="" disabled>Milestone Presets...</option>
+              <option value="perseverance_to_kodiak">1. Landing → Kodiak Butte</option>
+              <option value="three_forks_to_wildcat">2. Three Forks → Wildcat Ridge</option>
+              <option value="seitah_traversal">3. Séítah Outcrop → Artuby</option>
+              <option value="delta_top_ascent">4. Delta Scarp → Belva Overlook</option>
+              <option value="neretva_vallis_inflow">5. Upper Delta → Neretva Canyon</option>
+            </select>
           </div>
 
-          {/* EVA / Rover Traverse Simulator & Comparison Controls */}
-          {routeData && (
-            <div className={`bg-[#14161a]/80 backdrop-blur-md border rounded-lg p-1 px-2 flex items-center space-x-2 shadow-2xl pointer-events-auto transition-all ${
-              activeGuideStep === 6 ? 'border-sky-400 ring-2 ring-sky-400/80 shadow-sky-500/30' : 'border-sky-500/40'
-            }`}>
-              <div className="flex items-center space-x-1.5 pr-1 border-r border-[#33363D]">
-                <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
-                <span className="text-[10px] font-mono font-bold text-sky-400">
-                  {exploreMode === 'rover' ? 'ROVER SIM:' : 'EVA SIM:'}
-                </span>
-              </div>
+          <div className="w-[1px] h-4 bg-[#33363D]/60 mx-0.5" />
 
-              {/* Play / Pause button */}
+          {/* Rover Mode vs Astronaut Mode Segmented Switch */}
+          <div className={`bg-[#101114]/80 border rounded p-0.5 flex items-center space-x-0.5 transition-all ${
+            activeGuideStep === 2 ? 'border-[#D97745] ring-2 ring-[#D97745]/80 shadow-orange-500/30' : 'border-[#33363D]/60'
+          }`}>
+            <button
+              onClick={() => {
+                setExploreMode('rover');
+                if (setMaxSlope) setMaxSlope(15);
+                sfx.playBlip();
+                if (startPoint && destinationPoint) handleComputeRouteWithSlope(15);
+              }}
+              title="Rover Mode (15° slope limit, 0.12 km/h)"
+              className={`px-2 py-1 rounded text-[11px] transition-colors flex items-center space-x-1 ${
+                exploreMode === 'rover'
+                  ? 'bg-[#D97745] text-white font-bold shadow'
+                  : 'text-[#A6A8AD] hover:bg-[#22252c] hover:text-white'
+              }`}
+            >
+              <Truck className="w-3 h-3" />
+              <span className="hidden sm:inline">Rover (15°)</span>
+            </button>
+            <button
+              onClick={() => {
+                setExploreMode('astronaut');
+                if (setMaxSlope) setMaxSlope(25);
+                sfx.playBlip();
+                if (startPoint && destinationPoint) handleComputeRouteWithSlope(25);
+              }}
+              title="Astronaut Mode (25° slope limit, 1.1 km/h)"
+              className={`px-2 py-1 rounded text-[11px] transition-colors flex items-center space-x-1 ${
+                exploreMode === 'astronaut'
+                  ? 'bg-sky-500 text-black font-bold shadow'
+                  : 'text-[#A6A8AD] hover:bg-[#22252c] hover:text-white'
+              }`}
+            >
+              <User className="w-3 h-3" />
+              <span className="hidden sm:inline">EVA (25°)</span>
+            </button>
+          </div>
+
+          {/* Compute Action or EVA Simulation Transport Controls */}
+          {routeData ? (
+            <div className={`flex items-center space-x-1 pl-1 transition-all ${
+              activeGuideStep === 6 ? 'border border-sky-400 ring-2 ring-sky-400/80 rounded p-0.5' : ''
+            }`}>
               <button
                 onClick={() => {
                   setSimState(prev => {
@@ -1065,87 +920,133 @@ export default function MarsMap({
                   });
                   sfx.playBlip();
                 }}
-                className={`px-2 py-1 rounded text-xs font-mono font-bold flex items-center space-x-1 transition-colors ${
-                  simState.isPlaying 
-                    ? 'bg-amber-500/80 text-black hover:bg-amber-400' 
-                    : 'bg-sky-500 hover:bg-sky-400 text-black'
-                }`}
+                className="px-2.5 py-1 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-[11px] flex items-center space-x-1 shadow transition-transform active:scale-95"
               >
-                {simState.isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                <span>{simState.isPlaying ? 'PAUSE [Space]' : 'SIMULATE [Space]'}</span>
+                {simState.isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 fill-black" />}
+                <span>{simState.isPlaying ? 'PAUSE' : 'SIMULATE'}</span>
               </button>
-
-              {/* Rewind */}
               <button
                 onClick={() => {
-                  setSimState(prev => ({ ...prev, isPlaying: false, stepIndex: 0 }));
-                  sfx.playBlip();
-                }}
-                title="Rewind Traverse"
-                className="p-1 rounded text-[#A6A8AD] hover:text-white hover:bg-[#22252c] transition-colors"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Speed toggle */}
-              <button
-                onClick={() => {
-                  const nextSpeed = simState.speed === 1 ? 2 : simState.speed === 2 ? 5 : 1;
+                  const speeds = [1, 2, 5, 10];
+                  const nextSpeed = speeds[(speeds.indexOf(simState.speed) + 1) % speeds.length];
                   setSimState(prev => ({ ...prev, speed: nextSpeed }));
                   sfx.playBlip();
                 }}
-                className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#14161a] border border-[#33363D] text-[#A6A8AD] hover:text-sky-300"
+                className="px-1.5 py-1 rounded bg-[#22252c] hover:bg-[#2b2e36] text-[#A6A8AD] hover:text-white border border-[#33363D] text-[10px]"
+                title="Simulation Speed Multiplier"
               >
                 {simState.speed}x
               </button>
-
-              {/* Progress */}
-              <span className="text-[10px] font-mono text-white">
-                {((simState.stepIndex / (routeData.route.length - 1)) * 100).toFixed(0)}%
-              </span>
-
-              {/* Shortest Route Comparison toggle */}
               <button
                 onClick={() => { setShowShortestComparison(!showShortestComparison); sfx.playBlip(); }}
-                title="Toggle display of direct Shortest Path vs Safest A* route on map"
-                className={`px-1.5 py-0.5 rounded text-[10px] font-mono border transition-colors flex items-center space-x-1 ml-1 ${
-                  showShortestComparison
-                    ? 'bg-slate-700/80 text-white border-slate-500 font-bold'
-                    : 'bg-[#14161a] text-[#A6A8AD] border-[#33363D] hover:text-white'
+                title="Toggle display of direct Shortest Path vs Safest A* route"
+                className={`px-1.5 py-1 rounded text-[10px] border transition-colors hidden md:block ${
+                  showShortestComparison ? 'bg-slate-700/80 text-white border-slate-500 font-bold' : 'bg-[#14161a] text-[#A6A8AD] border-[#33363D]'
                 }`}
               >
-                <span className="w-2.5 h-0.5 border-t border-dashed border-gray-300"></span>
-                <span>Shortest: {showShortestComparison ? 'ON' : 'OFF'}</span>
+                Shortest: {showShortestComparison ? 'ON' : 'OFF'}
               </button>
-
-              {/* Mission Dossier Modal Trigger */}
               <button
-                onClick={() => {
-                  setIsDossierOpen(true);
-                  sfx.playBlip();
-                }}
-                className="px-2 py-1 rounded bg-[#D97745]/20 hover:bg-[#D97745]/40 text-[#D97745] border border-[#D97745]/50 text-[10px] font-mono font-bold flex items-center space-x-1 transition-colors ml-1"
+                onClick={() => setIsDossierOpen(true)}
+                title="View Full Mission Dossier (D)"
+                className="px-2 py-1 rounded bg-[#D97745]/20 hover:bg-[#D97745]/30 text-[#D97745] border border-[#D97745]/40 text-[10px] hidden sm:flex items-center space-x-1"
               >
                 <FileText className="w-3 h-3" />
-                <span>DOSSIER [D]</span>
+                <span>Dossier</span>
+              </button>
+              <button
+                onClick={handleResetPoints}
+                title="Reset Route (R)"
+                className="p-1 rounded bg-[#22252c] hover:bg-rose-950/50 text-[#A6A8AD] hover:text-rose-400 border border-[#33363D]"
+              >
+                <RotateCcw className="w-3 h-3" />
               </button>
             </div>
-          )}
-
-          {/* Toast Notification */}
-          {feedbackMsg && (
-            <div className={`pointer-events-auto text-xs font-mono px-3 py-1.5 rounded-lg max-w-sm shadow-xl backdrop-blur-md border transition-all ${
-              feedbackMsg.type === 'error'
-                ? 'bg-rose-950/90 border-rose-500/50 text-rose-200'
-                : feedbackMsg.type === 'warning'
-                ? 'bg-amber-950/90 border-amber-500/50 text-amber-200'
-                : 'bg-[#191b20]/95 border-emerald-500/50 text-emerald-300'
-            }`}>
-              {feedbackMsg.text}
-            </div>
+          ) : (
+            startPoint && destinationPoint && (
+              <button
+                onClick={handleComputeRoute}
+                disabled={isCalculating}
+                className={`bg-[#D97745] hover:bg-[#B85C38] text-white px-3 py-1 rounded font-bold text-[11px] shadow flex items-center space-x-1 transition-transform active:scale-95 animate-pulse ${
+                  activeGuideStep === 2 ? 'ring-2 ring-orange-400 shadow-orange-500/50 scale-105' : ''
+                }`}
+              >
+                <Play className={`w-3 h-3 fill-white ${isCalculating ? 'animate-spin' : ''}`} />
+                <span>{isCalculating ? 'COMPUTING...' : 'COMPUTE ROUTE'}</span>
+              </button>
+            )
           )}
         </div>
+
+        {/* Right Section: Quick Tactical Tools */}
+        <div className="flex items-center gap-1 pointer-events-auto bg-[#14161a]/85 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 shadow-xl">
+          <button
+            onClick={() => { setShowGraticule(!showGraticule); sfx.playBlip(); }}
+            title="Toggle Tactical Martian Grid (G)"
+            className={`p-1.5 rounded transition-colors ${
+              showGraticule ? 'bg-sky-500/20 text-sky-300 font-bold' : 'text-[#A6A8AD] hover:text-white hover:bg-[#22252c]'
+            }`}
+          >
+            <Grid className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMeasureMode(!isMeasureMode);
+              setMeasurePoints([]);
+              sfx.playBlip();
+            }}
+            title="Measure distance & elevation difference"
+            className={`p-1.5 rounded transition-colors ${
+              isMeasureMode ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40' : 'text-[#A6A8AD] hover:text-white hover:bg-[#22252c]'
+            }`}
+          >
+            <Ruler className="w-3.5 h-3.5" />
+          </button>
+
+          {startPoint && destinationPoint && (
+            <button
+              onClick={handleShareMission}
+              title="Copy Shareable Route Link to Clipboard"
+              className="p-1.5 rounded bg-[#22252c] hover:bg-sky-950/50 text-sky-400 hover:text-sky-300 border border-[#33363D] transition-colors"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          <button
+            onClick={() => { setShowGuideModal(true); sfx.playBlip(); }}
+            title="Interactive Walkthrough Guide for Judges"
+            className="px-2 py-1 rounded text-xs font-mono flex items-center space-x-1 bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[10px] font-bold hidden sm:inline">Guide</span>
+          </button>
+
+          <button
+            onClick={handleToggleMute}
+            title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+            className="p-1.5 rounded text-[#A6A8AD] hover:text-white hover:bg-[#22252c] transition-colors"
+          >
+            {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5 text-emerald-400" />}
+          </button>
+        </div>
       </div>
+
+      {/* Floating Feedback Notification */}
+      {feedbackMsg && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[1050] pointer-events-auto text-xs font-mono px-3 py-1.5 rounded-lg max-w-sm shadow-xl backdrop-blur-md border animate-in slide-in-from-top-2 duration-200">
+          <div className={
+            feedbackMsg.type === 'error'
+              ? 'bg-rose-950/90 border-rose-500/50 text-rose-200'
+              : feedbackMsg.type === 'warning'
+              ? 'bg-amber-950/90 border-amber-500/50 text-amber-200'
+              : 'bg-[#14161a]/95 border-emerald-500/50 text-emerald-300'
+          }>
+            {feedbackMsg.text}
+          </div>
+        </div>
+      )}
 
       {/* Main Leaflet Map Container - Bounded tightly to Jezero Crater Delta edge-to-edge */}
       <MapContainer
