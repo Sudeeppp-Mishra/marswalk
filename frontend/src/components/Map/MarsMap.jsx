@@ -34,6 +34,7 @@ import {
   CheckCircle2, 
   Sparkles, 
   Download,
+  Share2,
   Keyboard,
   Navigation as NavIcon 
 } from 'lucide-react';
@@ -441,6 +442,18 @@ export default function MarsMap({
     setSimState({ isPlaying: false, stepIndex: 0, speed: 1 });
   };
 
+  const handleShareMission = () => {
+    if (!startPoint || !destinationPoint) return;
+    const url = `${window.location.origin}${window.location.pathname}?start=${startPoint.lat},${startPoint.lng}&dest=${destinationPoint.lat},${destinationPoint.lng}&slope=${maxSlope}`;
+    navigator.clipboard.writeText(url).then(() => {
+      sfx.playSuccess();
+      setFeedbackMsg({ type: 'success', text: 'Mission Dispatch Link copied to clipboard!' });
+      setTimeout(() => setFeedbackMsg(null), 3500);
+    }).catch(() => {
+      sfx.playBlip();
+    });
+  };
+
   // 5 Authentic Perseverance presets with real rover landing & science targets
   const handleApplyPreset = (presetKey) => {
     sfx.playBlip();
@@ -694,6 +707,17 @@ export default function MarsMap({
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span>RESET [R]</span>
+                </button>
+              )}
+
+              {startPoint && destinationPoint && (
+                <button
+                  onClick={handleShareMission}
+                  title="Copy Mission Dispatch Link to Clipboard"
+                  className="px-2 py-0.5 rounded bg-[#22252c] hover:bg-sky-950/50 text-[#A6A8AD] hover:text-sky-300 border border-[#33363D] transition-colors flex items-center space-x-1 text-[10px]"
+                >
+                  <Share2 className="w-3 h-3 text-sky-400" />
+                  <span>SHARE</span>
                 </button>
               )}
             </div>
@@ -1273,6 +1297,10 @@ export default function MarsMap({
         routeData={routeData}
         onHoverPoint={(pt) => setScrubberPoint(pt)}
         onLeavePoint={() => setScrubberPoint(null)}
+        onJumpToStep={(stepIdx) => {
+          setSimState(prev => ({ ...prev, stepIndex: stepIdx, isPlaying: false }));
+          sfx.playBlip();
+        }}
       />
 
       {/* Map Scientific Colormap Legend */}

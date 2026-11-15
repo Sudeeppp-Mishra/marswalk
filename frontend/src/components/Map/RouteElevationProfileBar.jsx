@@ -4,7 +4,8 @@ import { ChevronDown, ChevronUp, Mountain, TrendingUp } from 'lucide-react';
 export default function RouteElevationProfileBar({ 
   routeData, 
   onHoverPoint, 
-  onLeavePoint 
+  onLeavePoint,
+  onJumpToStep 
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [hoverInfo, setHoverInfo] = useState(null);
@@ -60,6 +61,17 @@ export default function RouteElevationProfileBar({
     }
   };
 
+  const handleClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const clampedX = Math.max(paddingX, Math.min(width - paddingX, mouseX));
+    const ratio = (clampedX - paddingX) / graphWidth;
+    const index = Math.round(ratio * (route.length - 1));
+    if (onJumpToStep) {
+      onJumpToStep(index);
+    }
+  };
+
   const handleMouseLeave = () => {
     setHoverInfo(null);
     if (onLeavePoint) onLeavePoint();
@@ -95,6 +107,7 @@ export default function RouteElevationProfileBar({
                 className="w-full h-24 overflow-visible cursor-crosshair select-none"
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
+                onClick={handleClick}
               >
                 <defs>
                   <linearGradient id="mapElevGrad" x1="0" y1="0" x2="0" y2="1">

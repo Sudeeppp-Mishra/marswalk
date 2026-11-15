@@ -29,6 +29,44 @@ export default function App() {
   const [activeLayer, setActiveLayer] = useState('ctx');
   const [routeData, setRouteData] = useState(null);
   const [maxSlope, setMaxSlope] = useState(20.0);
+  const [isTacticalMode, setIsTacticalMode] = useState(false);
+
+  // Initialize from URL deep-linking query parameters (e.g. ?start=18.4447,77.4508&dest=18.4231,77.4125&slope=20)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const startParam = params.get('start');
+      const destParam = params.get('dest');
+      const slopeParam = params.get('slope') || params.get('max_slope');
+
+      if (slopeParam && !isNaN(parseFloat(slopeParam))) {
+        setMaxSlope(parseFloat(slopeParam));
+      }
+
+      if (startParam && destParam) {
+        const [sLat, sLng] = startParam.split(',').map(Number);
+        const [dLat, dLng] = destParam.split(',').map(Number);
+        if (!isNaN(sLat) && !isNaN(sLng) && !isNaN(dLat) && !isNaN(dLng)) {
+          setStartPoint({ lat: sLat, lng: sLng });
+          setDestinationPoint({ lat: dLat, lng: dLng });
+        }
+      }
+    } catch (e) {
+      console.warn('URL deep-link parse error:', e);
+    }
+  }, []);
+
+  // Keyboard shortcut: Press F to toggle Full-Screen Tactical Ops mode
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      if (e.key === 'f' || e.key === 'F') {
+        setIsTacticalMode(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     async function init() {
@@ -219,10 +257,16 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#101114] text-[#F3F3F3] overflow-hidden select-none">
-      <Header backendStatus={backendStatus} activeTab={activeTab} destinationPoint={destinationPoint} />
+      <Header 
+        backendStatus={backendStatus} 
+        activeTab={activeTab} 
+        destinationPoint={destinationPoint}
+        isTacticalMode={isTacticalMode}
+        onToggleTactical={() => setIsTacticalMode(prev => !prev)}
+      />
 
       <div className="flex flex-1 overflow-hidden">
-        <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+        {!isTacticalMode && <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />}
 
         <main className="flex-1 relative flex flex-col overflow-hidden bg-[#101114]">
           {activeTab === 'explore' && (
