@@ -217,6 +217,10 @@ export async function getGeologyData() {
 }
 
 export function getOverlayUrl(type) {
+  // Static overlays bundled with frontend for 100% uptime, zero latency, and no backend dependence
+  if (type === 'ctx') return '/overlays/jezero_ctx_local_overlay.png';
+  if (type === 'elevation') return '/overlays/jezero_elevation_overlay.png';
+  if (type === 'slope') return '/overlays/jezero_slope_overlay.png';
   return `${BASE_URL}/terrain/overlay/${type}`;
 }
 

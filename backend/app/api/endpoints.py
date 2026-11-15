@@ -98,10 +98,13 @@ async def get_terrain_overlay(overlay_type: str):
         raise HTTPException(status_code=404, detail="Invalid overlay type. Use 'ctx', 'elevation', or 'slope'.")
 
     if not overlay_path.exists():
-        terrain_engine.generate_visualization_overlays()
+        try:
+            terrain_engine.generate_visualization_overlays()
+        except Exception as e:
+            logger.warning(f"Overlay generation failed: {e}")
 
     if not overlay_path.exists():
-        raise HTTPException(status_code=500, detail="Failed to generate overlay.")
+        raise HTTPException(status_code=404, detail=f"Overlay '{overlay_type}' not available.")
 
     return FileResponse(overlay_path, media_type="image/png")
 

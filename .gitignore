@@ -43,23 +43,21 @@ pnpm-debug.log*
 # ==============================
 # NASA Scientific Datasets
 # ==============================
-data/raw/
-data/processed/
 datasets/
 downloads/
 
-# Large scientific imagery and elevation data
+# Gigabyte-scale scientific imagery (>100MB, keep local)
+*hirise*.tif
+*HIRISE*.tif
+*orthoMosaic_25cm*.tif
+*orthoMosaic_6m*.tif
 *.img
 *.jp2
-*.tif
-*.tiff
 *.vrt
 *.cub
 *.lbl
 *.IMG
 *.JP2
-*.TIF
-*.TIFF
 
 # Temporary processing outputs
 *.tmp
