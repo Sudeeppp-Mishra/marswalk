@@ -57,6 +57,7 @@ import HiRISEInspectorModal from './HiRISEInspectorModal';
 import Terrain3DModal from './Terrain3DModal';
 import InUIGuideTour from '../Common/InUIGuideTour';
 import PaleolakeDrawer from './PaleolakeDrawer';
+import AutoDemoBriefing from './AutoDemoBriefing';
 import { generatePaleolakeCanvasUrl } from '../../utils/paleolake';
 
 const JEZERO_BOUNDS = [
@@ -320,6 +321,7 @@ export default function MarsMap({
   const [waterLevel, setWaterLevel] = useState(-2395); // Gilbert delta canonical shoreline
   const [avoidWater, setAvoidWater] = useState(false);
   const [paleolakeOverlayUrl, setPaleolakeOverlayUrl] = useState(null);
+  const [isAutoDemoActive, setIsAutoDemoActive] = useState(false);
   const heightmapImgRef = useRef(null);
 
   // Pre-load authentic heightmap image for instant client-side paleolake canvas rendering
@@ -1146,6 +1148,18 @@ export default function MarsMap({
           )}
 
           <button
+            onClick={() => {
+              setIsAutoDemoActive(true);
+              sfx.playSuccess();
+            }}
+            title="1-Click Mission Briefing for Judges (Auto Demo ~38s)"
+            className="px-2.5 py-1 rounded text-xs font-mono flex items-center space-x-1.5 bg-gradient-to-r from-emerald-500/25 to-sky-500/25 text-emerald-300 border border-emerald-400/60 hover:border-emerald-300 transition-all shadow-md shadow-emerald-500/20 active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300 animate-pulse" />
+            <span className="text-[10px] font-bold">Play Demo</span>
+          </button>
+
+          <button
             onClick={() => { setShowGuideModal(true); sfx.playBlip(); }}
             title="Interactive Walkthrough Guide for Judges"
             className="px-2 py-1 rounded text-xs font-mono flex items-center space-x-1 bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-colors"
@@ -1865,6 +1879,24 @@ export default function MarsMap({
         waterLevel={waterLevel}
         isLakeActive={isLakeActive}
         onWaterLevelChange={(lvl) => setWaterLevel(lvl)}
+      />
+
+      {/* 1-Click Automated Mission Briefing for Judges */}
+      <AutoDemoBriefing
+        isActive={isAutoDemoActive}
+        onClose={() => setIsAutoDemoActive(false)}
+        applyPreset={handleApplyPreset}
+        setActiveLayer={(layer) => setActiveLayer(layer)}
+        setOverlayOpacity={(op) => setOverlayOpacity(op)}
+        computeRoute={handleComputeRoute}
+        setLakeActive={(active, lvl) => {
+          setIsLakeActive(active);
+          if (lvl !== undefined) setWaterLevel(lvl);
+        }}
+        startSim={() => setSimState(prev => ({ ...prev, isPlaying: true, stepIndex: 0, speed: 2 }))}
+        stopSim={() => setSimState(prev => ({ ...prev, isPlaying: false }))}
+        openDossier={() => setIsDossierOpen(true)}
+        closeDossier={() => setIsDossierOpen(false)}
       />
     </div>
   );
