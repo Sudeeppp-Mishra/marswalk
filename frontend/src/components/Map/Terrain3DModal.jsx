@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { 
@@ -7,20 +7,16 @@ import {
   RotateCw, 
   Sun, 
   Mountain, 
-  Eye, 
   Sliders, 
-  Sparkles,
   Compass,
   Play,
-  Pause,
-  MapPin,
-  TrendingUp,
-  Layers,
+  RotateCcw,
   Camera,
-  FastForward,
   Navigation,
+  Tag,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 import { calculateRoute } from '../../services/api';
 import { sfx } from '../../utils/audio';
@@ -34,7 +30,7 @@ const JEZERO_BOUNDS = {
   maxElev: -1515.5
 };
 
-// 6 Authentic Jezero Landmarks with coordinates and descriptions
+// 6 Authentic Jezero Landmarks with staggered mast heights to prevent visual occlusion
 const LANDMARKS = [
   { 
     id: 'landing', 
@@ -43,6 +39,8 @@ const LANDMARKS = [
     lat: 18.4447, 
     lng: 77.4508, 
     color: '#10B981',
+    mastHeight: 3.2,
+    badgeY: 4.8,
     description: 'Touchdown point of Mars 2020 Perseverance inside Jezero crater floor.'
   },
   { 
@@ -52,6 +50,8 @@ const LANDMARKS = [
     lat: 18.4231, 
     lng: 77.4125, 
     color: '#38BDF8',
+    mastHeight: 6.5,
+    badgeY: 8.8,
     description: 'Stratified Gilbert-type foreset outcrop proving Lake Jezero water depth.'
   },
   { 
@@ -61,6 +61,8 @@ const LANDMARKS = [
     lat: 18.4483, 
     lng: 77.4049, 
     color: '#F59E0B',
+    mastHeight: 4.5,
+    badgeY: 6.4,
     description: 'Fine-grained mudstones where SHERLOC detected organic molecules.'
   },
   { 
@@ -70,6 +72,8 @@ const LANDMARKS = [
     lat: 18.4886, 
     lng: 77.4438, 
     color: '#EF4444',
+    mastHeight: 8.5,
+    badgeY: 11.4,
     description: 'Deep impact crater rim exposing 3D cross-sections of fluvial conglomerates.'
   },
   { 
@@ -79,6 +83,8 @@ const LANDMARKS = [
     lat: 18.4820, 
     lng: 77.3600, 
     color: '#EC4899',
+    mastHeight: 10.2,
+    badgeY: 13.8,
     description: 'Ancient river breach canyon carved by catastrophic flooding into the lake.'
   },
   { 
@@ -88,6 +94,8 @@ const LANDMARKS = [
     lat: 18.4350, 
     lng: 77.4400, 
     color: '#A855F7',
+    mastHeight: 5.2,
+    badgeY: 7.4,
     description: 'Flat landing floor depot where 10 sample return tubes were deposited.'
   }
 ];
@@ -114,12 +122,14 @@ export default function Terrain3DModal({
   const [exaggeration, setExaggeration] = useState(2.2);
   const [textureType, setTextureType] = useState('ctx'); // 'ctx', 'elevation', 'slope'
   const [sunMode, setSunMode] = useState('noon'); // 'noon', 'sunset', 'dawn'
+  const [labelMode, setLabelMode] = useState('all'); // 'all', 'focus', 'off'
   const [isAutoRotating, setIsAutoRotating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isCalculating, setIsCalculating] = useState(false);
   const [selectedLandmark, setSelectedLandmark] = useState(null);
+  const [feedbackNotice, setFeedbackNotice] = useState(null);
 
-  // Active route state (synced with parent or computed locally in 3D)
+  // Active route and waypoint state in 3D
   const [activeRoute, setActiveRoute] = useState(initialRouteData);
   const [startPoint, setStartPoint] = useState(initialStartPoint);
   const [destPoint, setDestPoint] = useState(initialDestPoint);
@@ -135,22 +145,38 @@ export default function Terrain3DModal({
   const controlsRef = useRef(null);
   const terrainMeshRef = useRef(null);
   const routeLineRef = useRef(null);
-  const routeGlowRef = useRef(null);
-  const beaconPinsRef = useRef(null);
-  const markersGroupRef = useRef(null);
+  const waypointPinsGroupRef = useRef(null);
+  const landmarksGroupRef = useRef(null);
   const heightDataRef = useRef(null);
   const dirLightRef = useRef(null);
 
-  // Auto-rotating state ref to avoid stale closures in requestAnimationFrame
+  // Refs for animation loop to avoid stale React closures
   const isAutoRotatingRef = useRef(isAutoRotating);
-  useEffect(() => {
-    isAutoRotatingRef.current = isAutoRotating;
-  }, [isAutoRotating]);
+  const activeRouteRef = useRef(activeRoute);
+  const labelModeRef = useRef(labelMode);
+  const selectedLandmarkRef = useRef(selectedLandmark);
+  const startPointRef = useRef(startPoint);
+  const destPointRef = useRef(destPoint);
 
-  // Keep route synced with prop if prop changes
+  useEffect(() => { isAutoRotatingRef.current = isAutoRotating; }, [isAutoRotating]);
+  useEffect(() => { activeRouteRef.current = activeRoute; }, [activeRoute]);
+  useEffect(() => { labelModeRef.current = labelMode; }, [labelMode]);
+  useEffect(() => { selectedLandmarkRef.current = selectedLandmark; }, [selectedLandmark]);
+  useEffect(() => { startPointRef.current = startPoint; }, [startPoint]);
+  useEffect(() => { destPointRef.current = destPoint; }, [destPoint]);
+
+  // Sync with props
   useEffect(() => {
     setActiveRoute(initialRouteData);
   }, [initialRouteData]);
+
+  useEffect(() => {
+    setStartPoint(initialStartPoint);
+  }, [initialStartPoint]);
+
+  useEffect(() => {
+    setDestPoint(initialDestPoint);
+  }, [initialDestPoint]);
 
   // Convert (lat, lng, elev) to 3D X, Y, Z space (mesh centered at 0, 0, size 100x100)
   const geoTo3D = (lat, lng, elev = null, heightGrid = null, exag = 2.2) => {
@@ -173,37 +199,46 @@ export default function Terrain3DModal({
     return { x, y, z };
   };
 
-  // Helper to generate a crisp 3D Billboard text badge sprite
-  const createBillboardBadge = (name, subtitle, color) => {
+  // Convert 3D X, Z hit point back to geographical (lat, lng)
+  const threeDToGeo = (x, z) => {
+    const normX = (x / 100) + 0.5;
+    const normY = 0.5 - (z / 100);
+    const lng = Number((JEZERO_BOUNDS.minLng + normX * (JEZERO_BOUNDS.maxLng - JEZERO_BOUNDS.minLng)).toFixed(4));
+    const lat = Number((JEZERO_BOUNDS.minLat + normY * (JEZERO_BOUNDS.maxLat - JEZERO_BOUNDS.minLat)).toFixed(4));
+    return { lat, lng };
+  };
+
+  // Helper to generate a compact, crisp 3D Billboard text badge sprite
+  const createCompactBillboard = (name, subtitle, color) => {
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 140;
+    canvas.width = 384;
+    canvas.height = 96;
     const ctx = canvas.getContext('2d');
 
-    // Outer card background
-    ctx.fillStyle = 'rgba(16, 17, 20, 0.90)';
+    // Outer card pill
+    ctx.fillStyle = 'rgba(16, 17, 20, 0.92)';
     ctx.strokeStyle = color;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.roundRect(8, 8, 496, 124, 20);
+    ctx.roundRect(6, 6, 372, 84, 16);
     ctx.fill();
     ctx.stroke();
 
     // Beacon glow dot
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(46, 70, 16, 0, Math.PI * 2);
+    ctx.arc(36, 48, 12, 0, Math.PI * 2);
     ctx.fill();
 
     // Primary Name
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 36px monospace';
-    ctx.fillText(name, 80, 62);
+    ctx.font = 'bold 28px monospace';
+    ctx.fillText(name, 62, 44);
 
-    // Subtitle / context
+    // Subtitle
     ctx.fillStyle = '#94A3B8';
-    ctx.font = '22px monospace';
-    ctx.fillText(subtitle, 80, 105);
+    ctx.font = '18px monospace';
+    ctx.fillText(subtitle, 62, 72);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
@@ -213,11 +248,74 @@ export default function Terrain3DModal({
       transparent: true
     });
     const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.scale.set(13.5, 3.8, 1);
+    sprite.scale.set(7.5, 1.9, 1);
     return sprite;
   };
 
-  // Main Three.js Setup Effect
+  // Update Waypoint Markers (Start & Destination Beacons) on the 3D surface
+  const updateWaypointBeacons = (start, dest, scene, heightGrid, exag) => {
+    const activeScene = scene || sceneRef.current;
+    const activeGrid = heightGrid || heightDataRef.current;
+    if (!activeScene || !activeGrid) return;
+
+    if (waypointPinsGroupRef.current) {
+      activeScene.remove(waypointPinsGroupRef.current);
+      waypointPinsGroupRef.current = null;
+    }
+
+    const group = new THREE.Group();
+
+    // Origin Beacon (Emerald)
+    if (start) {
+      const p = geoTo3D(start.lat, start.lng, null, activeGrid, exag);
+      const mast = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.18, 6.0, 8),
+        new THREE.MeshBasicMaterial({ color: 0x10b981 })
+      );
+      mast.position.set(p.x, p.y + 3.0, p.z);
+
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(1.2, 16, 16),
+        new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x10b981, emissiveIntensity: 1 })
+      );
+      sphere.position.set(p.x, p.y + 6.0, p.z);
+
+      const badge = createCompactBillboard('ORIGIN WAYPOINT', `${start.lat}° N, ${start.lng}° E`, '#10B981');
+      badge.position.set(p.x, p.y + 8.2, p.z);
+
+      group.add(mast);
+      group.add(sphere);
+      group.add(badge);
+    }
+
+    // Target Destination Beacon (Terracotta)
+    if (dest) {
+      const p = geoTo3D(dest.lat, dest.lng, null, activeGrid, exag);
+      const mast = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.18, 6.0, 8),
+        new THREE.MeshBasicMaterial({ color: 0xd97745 })
+      );
+      mast.position.set(p.x, p.y + 3.0, p.z);
+
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(1.2, 16, 16),
+        new THREE.MeshStandardMaterial({ color: 0xd97745, emissive: 0xd97745, emissiveIntensity: 1 })
+      );
+      sphere.position.set(p.x, p.y + 6.0, p.z);
+
+      const badge = createCompactBillboard('TARGET WAYPOINT', `${dest.lat}° N, ${dest.lng}° E`, '#D97745');
+      badge.position.set(p.x, p.y + 8.2, p.z);
+
+      group.add(mast);
+      group.add(sphere);
+      group.add(badge);
+    }
+
+    activeScene.add(group);
+    waypointPinsGroupRef.current = group;
+  };
+
+  // Main Three.js Mount Effect
   useEffect(() => {
     if (!isOpen || !mountRef.current) return;
 
@@ -235,7 +333,7 @@ export default function Terrain3DModal({
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 1000);
     cameraRef.current = camera;
-    camera.position.set(0, 60, 80);
+    camera.position.set(0, 58, 76);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -257,16 +355,16 @@ export default function Terrain3DModal({
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.maxPolarAngle = Math.PI / 2.05; // Prevent flipping under ground
-    controls.minDistance = 10;
-    controls.maxDistance = 260;
+    controls.minDistance = 8;
+    controls.maxDistance = 250;
     controls.target.set(0, 0, 0);
 
-    // 3. Lighting (Martian Solar Illumination)
-    const ambientLight = new THREE.AmbientLight(0xffeedd, 0.65);
+    // 3. Lighting
+    const ambientLight = new THREE.AmbientLight(0xffeedd, 0.7);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfff5e6, 1.4);
-    dirLight.position.set(60, 90, 40);
+    const dirLight = new THREE.DirectionalLight(0xfff5e6, 1.45);
+    dirLight.position.set(50, 85, 35);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 1024;
     dirLight.shadow.mapSize.height = 1024;
@@ -294,7 +392,7 @@ export default function Terrain3DModal({
       }
       heightDataRef.current = heightGrid;
 
-      // Create 3D Terrain Plane Geometry
+      // Construct 3D Terrain Geometry
       const segs = 180;
       const geometry = new THREE.PlaneGeometry(100, 100, segs, segs);
       geometry.rotateX(-Math.PI / 2);
@@ -338,23 +436,97 @@ export default function Terrain3DModal({
       scene.add(terrainMesh);
       terrainMeshRef.current = terrainMesh;
 
-      // 5. Render All 6 Landmarks with 3D Billboard Badges
-      renderLandmarks(scene, heightGrid, exaggeration);
+      // Render Staggered Landmarks & Active Waypoint Beacons
+      renderLandmarks(scene, heightGrid, exaggeration, labelModeRef.current, selectedLandmarkRef.current);
+      updateWaypointBeacons(startPointRef.current, destPointRef.current, scene, heightGrid, exaggeration);
 
-      // 6. Render Active 3D Route
-      if (activeRoute) {
-        render3DRoute(scene, activeRoute, heightGrid, exaggeration);
+      // Render Active 3D Route if present
+      if (activeRouteRef.current) {
+        render3DRoute(scene, activeRouteRef.current, heightGrid, exaggeration);
       }
 
       setIsLoading(false);
     };
 
-    // Animation Render Loop
+    // 5. Interactive Click-on-Terrain Raycasting Handler
+    let pointerDownPos = { x: 0, y: 0, time: 0 };
+
+    const onPointerDown = (e) => {
+      pointerDownPos = { x: e.clientX, y: e.clientY, time: Date.now() };
+    };
+
+    const onPointerUp = (e) => {
+      const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      const duration = Date.now() - pointerDownPos.time;
+      // If user dragged to rotate or pan, ignore as camera movement
+      if (dist > 6 || duration > 400) return;
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      );
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+
+      if (terrainMeshRef.current) {
+        const intersects = raycaster.intersectObject(terrainMeshRef.current);
+        if (intersects.length > 0) {
+          const hit = intersects[0].point;
+          const geo = threeDToGeo(hit.x, hit.z);
+
+          // Handle Interactive 3D Waypoint Setting
+          const currentStart = startPointRef.current;
+          const currentDest = destPointRef.current;
+
+          if (!currentStart) {
+            setStartPoint(geo);
+            if (onSelectWaypoint) onSelectWaypoint('start', geo);
+            updateWaypointBeacons(geo, null, scene, heightDataRef.current, exaggeration);
+            setFeedbackNotice({ type: 'info', text: `Origin set: ${geo.lat}° N, ${geo.lng}° E. Click terrain to set Target.` });
+            setTimeout(() => setFeedbackNotice(null), 3500);
+            sfx.playBlip();
+          } else if (!currentDest) {
+            setDestPoint(geo);
+            if (onSelectWaypoint) onSelectWaypoint('destination', geo);
+            updateWaypointBeacons(currentStart, geo, scene, heightDataRef.current, exaggeration);
+            setFeedbackNotice({ type: 'success', text: `Target set: ${geo.lat}° N, ${geo.lng}° E. Calculating 3D path...` });
+            setTimeout(() => setFeedbackNotice(null), 3500);
+            sfx.playBlip();
+            // Automatically compute 3D route
+            handleCompute3DRoute(currentStart, geo);
+          } else {
+            // Reset to new origin
+            setStartPoint(geo);
+            setDestPoint(null);
+            setActiveRoute(null);
+            if (onSelectWaypoint) {
+              onSelectWaypoint('start', geo);
+              onSelectWaypoint('destination', null);
+            }
+            if (routeLineRef.current) {
+              scene.remove(routeLineRef.current);
+              routeLineRef.current = null;
+            }
+            updateWaypointBeacons(geo, null, scene, heightDataRef.current, exaggeration);
+            setFeedbackNotice({ type: 'info', text: `New Origin set: ${geo.lat}° N, ${geo.lng}° E. Click Target.` });
+            setTimeout(() => setFeedbackNotice(null), 3500);
+            sfx.playBlip();
+          }
+        }
+      }
+    };
+
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
+
+    // 6. Animation Render Loop
     let animId;
     const animate = () => {
       animId = requestAnimationFrame(animate);
 
-      // Orbit Auto-Rotate
+      // Auto-Rotate Orbit
       if (isAutoRotatingRef.current && controlsRef.current && !isFlyingOver) {
         controlsRef.current.autoRotate = true;
         controlsRef.current.autoRotateSpeed = 1.0;
@@ -363,9 +535,9 @@ export default function Terrain3DModal({
       }
 
       // Flyover Camera Animation along Route Spline
-      if (isFlyingOver && activeRoute?.route?.length > 1 && heightDataRef.current) {
-        flyoverProgressRef.current = (flyoverProgressRef.current + 0.0015) % 1.0;
-        const pts = activeRoute.route;
+      if (isFlyingOver && activeRouteRef.current?.route?.length > 1 && heightDataRef.current) {
+        flyoverProgressRef.current = (flyoverProgressRef.current + 0.0016) % 1.0;
+        const pts = activeRouteRef.current.route;
         const total = pts.length - 1;
         const exactIdx = flyoverProgressRef.current * total;
         const i0 = Math.floor(exactIdx);
@@ -376,8 +548,8 @@ export default function Terrain3DModal({
         const p1 = geoTo3D(pts[i1].lat, pts[i1].lng, pts[i1].elevation_m, heightDataRef.current, exaggeration);
 
         const currentPos = new THREE.Vector3().lerpVectors(
-          new THREE.Vector3(p0.x, p0.y + 4.5, p0.z),
-          new THREE.Vector3(p1.x, p1.y + 4.5, p1.z),
+          new THREE.Vector3(p0.x, p0.y + 4.2, p0.z),
+          new THREE.Vector3(p1.x, p1.y + 4.2, p1.z),
           t
         );
 
@@ -404,21 +576,19 @@ export default function Terrain3DModal({
       isSubscribed = false;
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('pointerup', onPointerUp);
       if (rendererRef.current && rendererRef.current.domElement) {
         rendererRef.current.dispose();
       }
     };
   }, [isOpen]);
 
-  // Render 3D Route Spline & Origin/Destination Beacons
+  // Render 3D Route Spline
   const render3DRoute = (scene, route, heightGrid, exag) => {
     if (routeLineRef.current) {
       scene.remove(routeLineRef.current);
       routeLineRef.current = null;
-    }
-    if (beaconPinsRef.current) {
-      scene.remove(beaconPinsRef.current);
-      beaconPinsRef.current = null;
     }
     if (!route?.route || route.route.length < 2) return;
 
@@ -428,94 +598,63 @@ export default function Terrain3DModal({
       points.push(new THREE.Vector3(pos.x, pos.y + 0.38, pos.z));
     });
 
-    // Glowing Neon Spline
     const curve = new THREE.CatmullRomCurve3(points);
-    const tubeGeometry = new THREE.TubeGeometry(curve, points.length * 2, 0.42, 8, false);
+    const tubeGeometry = new THREE.TubeGeometry(curve, points.length * 2, 0.45, 8, false);
     const tubeMaterial = new THREE.MeshStandardMaterial({
       color: 0x10b981,
       emissive: 0x059669,
-      emissiveIntensity: 0.9,
+      emissiveIntensity: 0.95,
       roughness: 0.25,
       metalness: 0.2
     });
     const tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
     scene.add(tubeMesh);
     routeLineRef.current = tubeMesh;
-
-    // Glowing Start / Destination Beacons
-    const beacons = new THREE.Group();
-    const start3D = points[0];
-    const dest3D = points[points.length - 1];
-
-    // Origin Beacon (Emerald)
-    const startCyl = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.15, 0.15, 6, 8),
-      new THREE.MeshBasicMaterial({ color: 0x10b981 })
-    );
-    startCyl.position.set(start3D.x, start3D.y + 3, start3D.z);
-    const startSphere = new THREE.Mesh(
-      new THREE.SphereGeometry(1.2, 16, 16),
-      new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x10b981, emissiveIntensity: 1 })
-    );
-    startSphere.position.set(start3D.x, start3D.y + 6, start3D.z);
-    beacons.add(startCyl);
-    beacons.add(startSphere);
-
-    // Destination Beacon (Mars Terracotta)
-    const destCyl = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.15, 0.15, 6, 8),
-      new THREE.MeshBasicMaterial({ color: 0xd97745 })
-    );
-    destCyl.position.set(dest3D.x, dest3D.y + 3, dest3D.z);
-    const destSphere = new THREE.Mesh(
-      new THREE.SphereGeometry(1.2, 16, 16),
-      new THREE.MeshStandardMaterial({ color: 0xd97745, emissive: 0xd97745, emissiveIntensity: 1 })
-    );
-    destSphere.position.set(dest3D.x, dest3D.y + 6, dest3D.z);
-    beacons.add(destCyl);
-    beacons.add(destSphere);
-
-    scene.add(beacons);
-    beaconPinsRef.current = beacons;
   };
 
-  // Render 6 Jezero Landmarks with Floating Billboard Labels
-  const renderLandmarks = (scene, heightGrid, exag) => {
-    if (markersGroupRef.current) {
-      scene.remove(markersGroupRef.current);
+  // Render 6 Jezero Landmarks with Staggered Elevations & Compact Badges
+  const renderLandmarks = (scene, heightGrid, exag, mode = 'all', focusedLandmark = null) => {
+    if (landmarksGroupRef.current) {
+      scene.remove(landmarksGroupRef.current);
     }
     const group = new THREE.Group();
 
     LANDMARKS.forEach((lm) => {
       const pos = geoTo3D(lm.lat, lm.lng, null, heightGrid, exag);
+      const isFocused = focusedLandmark && focusedLandmark.id === lm.id;
 
       // Pin Mast
-      const pinGeom = new THREE.CylinderGeometry(0.12, 0.12, 4.5, 8);
+      const mastH = isFocused ? lm.mastHeight * 1.3 : lm.mastHeight;
+      const pinGeom = new THREE.CylinderGeometry(0.12, 0.12, mastH, 8);
       const pinMat = new THREE.MeshBasicMaterial({ color: lm.color });
       const pin = new THREE.Mesh(pinGeom, pinMat);
-      pin.position.set(pos.x, pos.y + 2.25, pos.z);
+      pin.position.set(pos.x, pos.y + mastH / 2, pos.z);
 
       // Glowing Sphere
-      const sphereGeom = new THREE.SphereGeometry(0.9, 14, 14);
+      const sphereR = isFocused ? 1.3 : 0.85;
+      const sphereGeom = new THREE.SphereGeometry(sphereR, 14, 14);
       const sphereMat = new THREE.MeshStandardMaterial({
         color: lm.color,
         emissive: lm.color,
-        emissiveIntensity: 0.8
+        emissiveIntensity: isFocused ? 1.2 : 0.8
       });
       const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-      sphere.position.set(pos.x, pos.y + 4.5, pos.z);
-
-      // Floating 3D Billboard Text Badge
-      const billboard = createBillboardBadge(lm.name, lm.subtitle, lm.color);
-      billboard.position.set(pos.x, pos.y + 7.8, pos.z);
+      sphere.position.set(pos.x, pos.y + mastH, pos.z);
 
       group.add(pin);
       group.add(sphere);
-      group.add(billboard);
+
+      // Render Billboard Badge based on mode
+      const shouldRenderBadge = mode === 'all' || (mode === 'focus' && isFocused);
+      if (shouldRenderBadge) {
+        const billboard = createCompactBillboard(lm.name, lm.subtitle, lm.color);
+        billboard.position.set(pos.x, pos.y + lm.badgeY, pos.z);
+        group.add(billboard);
+      }
     });
 
     scene.add(group);
-    markersGroupRef.current = group;
+    landmarksGroupRef.current = group;
   };
 
   // Teleport Camera to Landmark
@@ -528,19 +667,54 @@ export default function Terrain3DModal({
     const camera = cameraRef.current;
     const controls = controlsRef.current;
 
-    // Smooth camera transition to landmark
     camera.position.set(pos.x, pos.y + 22, pos.z + 32);
     controls.target.set(pos.x, pos.y + 2, pos.z);
     controls.update();
+
+    if (sceneRef.current && heightDataRef.current) {
+      renderLandmarks(sceneRef.current, heightDataRef.current, exaggeration, labelMode, lm);
+    }
   };
 
-  // Compute Route Directly from 3D View
-  const handleCompute3DRoute = async (startCoords, destCoords) => {
-    setIsCalculating(true);
+  // Reset 3D Waypoints
+  const handleReset3DPoints = () => {
+    setStartPoint(null);
+    setDestPoint(null);
+    setActiveRoute(null);
+    setIsFlyingOver(false);
     sfx.playBlip();
 
-    const start = startCoords || startPoint || { lat: LANDMARKS[0].lat, lng: LANDMARKS[0].lng };
-    const dest = destCoords || destPoint || { lat: LANDMARKS[1].lat, lng: LANDMARKS[1].lng };
+    if (onSelectWaypoint) {
+      onSelectWaypoint('start', null);
+      onSelectWaypoint('destination', null);
+    }
+    if (sceneRef.current) {
+      if (routeLineRef.current) {
+        sceneRef.current.remove(routeLineRef.current);
+        routeLineRef.current = null;
+      }
+      if (waypointPinsGroupRef.current) {
+        sceneRef.current.remove(waypointPinsGroupRef.current);
+        waypointPinsGroupRef.current = null;
+      }
+    }
+    setFeedbackNotice({ type: 'info', text: 'Waypoints cleared. Click anywhere on 3D terrain to place Origin.' });
+    setTimeout(() => setFeedbackNotice(null), 3000);
+  };
+
+  // Compute Route in 3D
+  const handleCompute3DRoute = async (startCoords, destCoords) => {
+    const start = startCoords || startPoint;
+    const dest = destCoords || destPoint;
+
+    if (!start || !dest) {
+      setFeedbackNotice({ type: 'warning', text: 'Select both Origin & Target points on the 3D terrain first.' });
+      setTimeout(() => setFeedbackNotice(null), 4000);
+      return;
+    }
+
+    setIsCalculating(true);
+    sfx.playBlip();
 
     const res = await calculateRoute(start, dest, 20.0);
     setIsCalculating(false);
@@ -552,9 +726,13 @@ export default function Terrain3DModal({
 
       if (sceneRef.current && heightDataRef.current) {
         render3DRoute(sceneRef.current, res, heightDataRef.current, exaggeration);
+        updateWaypointBeacons(start, dest, sceneRef.current, heightDataRef.current, exaggeration);
       }
+      setFeedbackNotice({ type: 'success', text: `3D Route computed: ${res.distance_km} km (${res.estimated_difficulty})` });
+      setTimeout(() => setFeedbackNotice(null), 4000);
     } else {
       sfx.playWarning();
+      setFeedbackNotice({ type: 'error', text: res?.error || 'Path blocked by steep terrain hazards.' });
     }
   };
 
@@ -570,6 +748,7 @@ export default function Terrain3DModal({
       onSelectWaypoint('start', start);
       onSelectWaypoint('destination', dest);
     }
+    updateWaypointBeacons(start, dest, sceneRef.current, heightDataRef.current, exaggeration);
     handleCompute3DRoute(start, dest);
   };
 
@@ -598,7 +777,8 @@ export default function Terrain3DModal({
 
     if (sceneRef.current) {
       if (activeRoute) render3DRoute(sceneRef.current, activeRoute, heightGrid, newExag);
-      renderLandmarks(sceneRef.current, heightGrid, newExag);
+      renderLandmarks(sceneRef.current, heightGrid, newExag, labelMode, selectedLandmark);
+      updateWaypointBeacons(startPoint, destPoint, sceneRef.current, heightGrid, newExag);
     }
   };
 
@@ -633,27 +813,37 @@ export default function Terrain3DModal({
       light.color.setHex(0xfff5e6);
       sceneRef.current.background.setHex(0x0a0c10);
     } else if (mode === 'sunset') {
-      light.position.set(-80, 25, -40); // Low angle casting long dramatic shadows
-      light.intensity = 1.3;
-      light.color.setHex(0xff7744); // Martian golden-orange sunset
+      light.position.set(-80, 25, -40);
+      light.intensity = 1.35;
+      light.color.setHex(0xff7744);
       sceneRef.current.background.setHex(0x180d12);
     } else if (mode === 'dawn') {
       light.position.set(80, 30, 40);
-      light.intensity = 1.2;
+      light.intensity = 1.25;
       light.color.setHex(0xffeedd);
       sceneRef.current.background.setHex(0x0c0f18);
+    }
+  };
+
+  // Toggle Billboard Badges Mode (All / Focus Only / Off)
+  const handleToggleLabels = () => {
+    const nextMode = labelMode === 'all' ? 'focus' : labelMode === 'focus' ? 'off' : 'all';
+    setLabelMode(nextMode);
+    sfx.playBlip();
+    if (sceneRef.current && heightDataRef.current) {
+      renderLandmarks(sceneRef.current, heightDataRef.current, exaggeration, nextMode, selectedLandmark);
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[2500] flex items-center justify-center p-2 sm:p-5 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full h-full max-w-7xl bg-[#101114] border border-[#33363D] rounded-xl overflow-hidden flex flex-col shadow-2xl">
-        {/* Top Header Bar */}
-        <div className="bg-[#191b20] border-b border-[#33363D] px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 z-10 font-mono text-xs select-none">
-          {/* Title & Status */}
-          <div className="flex items-center space-x-2 sm:space-x-3">
+    <div className="fixed inset-0 z-[2500] flex items-center justify-center p-2 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200 select-none">
+      <div className="relative w-full h-[96vh] max-w-7xl bg-[#101114] border border-[#33363D] rounded-xl overflow-hidden flex flex-col shadow-2xl">
+        {/* Top Control Header Bar */}
+        <div className="bg-[#191b20] border-b border-[#33363D] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 z-10 font-mono text-xs">
+          {/* Title & Badge */}
+          <div className="flex items-center space-x-2.5">
             <div className="p-1.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
               <Box className="w-4 h-4" />
             </div>
@@ -661,22 +851,22 @@ export default function Terrain3DModal({
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-white text-sm">JEZERO 3D TERRAIN ORBIT</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">
-                  20m DTM MESH
+                  20m DTM
                 </span>
               </div>
               <p className="text-[10px] text-[#A6A8AD] hidden md:block">
-                Interactive WebGL 3D Model with Physics Orbit, Draped Textures &amp; Traversal Splines
+                Click terrain to set Origin &amp; Target • Interactive Physics Orbit
               </p>
             </div>
           </div>
 
-          {/* Center Group: Surface Textures & Sun Position */}
+          {/* Center: Surface Textures, Sun Angle & Labels Mode */}
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Texture Selector */}
             <div className="flex items-center space-x-1 bg-[#101114] p-1 rounded-lg border border-[#33363D]">
               <button
                 onClick={() => handleTextureChange('ctx')}
-                className={`px-2 py-1 rounded text-[10px] sm:text-[11px] transition-colors ${
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] transition-colors ${
                   textureType === 'ctx' ? 'bg-[#D97745] text-white font-bold' : 'text-[#A6A8AD] hover:text-white'
                 }`}
               >
@@ -684,25 +874,25 @@ export default function Terrain3DModal({
               </button>
               <button
                 onClick={() => handleTextureChange('elevation')}
-                className={`px-2 py-1 rounded text-[10px] sm:text-[11px] transition-colors ${
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] transition-colors ${
                   textureType === 'elevation' ? 'bg-[#D97745] text-white font-bold' : 'text-[#A6A8AD] hover:text-white'
                 }`}
               >
-                Elevation DEM
+                Elevation
               </button>
               <button
                 onClick={() => handleTextureChange('slope')}
-                className={`px-2 py-1 rounded text-[10px] sm:text-[11px] transition-colors ${
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] transition-colors ${
                   textureType === 'slope' ? 'bg-[#D97745] text-white font-bold' : 'text-[#A6A8AD] hover:text-white'
                 }`}
               >
-                Slope Hazard
+                Slope
               </button>
             </div>
 
-            {/* Sun Illumination Angle */}
+            {/* Sun Angle Selector */}
             <div className="flex items-center space-x-1 bg-[#101114] p-1 rounded-lg border border-[#33363D] text-[10px]">
-              <Sun className="w-3.5 h-3.5 text-amber-400 ml-1" />
+              <Sun className="w-3 h-3 text-amber-400 ml-0.5" />
               <button
                 onClick={() => handleSunModeChange('noon')}
                 className={`px-1.5 py-0.5 rounded ${sunMode === 'noon' ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-[#A6A8AD]'}`}
@@ -711,22 +901,26 @@ export default function Terrain3DModal({
               </button>
               <button
                 onClick={() => handleSunModeChange('sunset')}
-                title="Low-angle sunset casting dramatic shadows across crater scarps"
+                title="Low sun angle casting dramatic shadows"
                 className={`px-1.5 py-0.5 rounded ${sunMode === 'sunset' ? 'bg-orange-500/30 text-orange-300 font-bold' : 'text-[#A6A8AD]'}`}
               >
                 Sunset
               </button>
-              <button
-                onClick={() => handleSunModeChange('dawn')}
-                className={`px-1.5 py-0.5 rounded ${sunMode === 'dawn' ? 'bg-sky-500/20 text-sky-300 font-bold' : 'text-[#A6A8AD]'}`}
-              >
-                Dawn
-              </button>
             </div>
+
+            {/* Labels Toggle (All / Focus Only / Off) */}
+            <button
+              onClick={handleToggleLabels}
+              title="Cycle Labels Visibility (All -> Focus Only -> Off)"
+              className="px-2 py-1 rounded text-[10px] font-mono bg-[#101114] border border-[#33363D] text-[#A6A8AD] hover:text-white flex items-center space-x-1"
+            >
+              <Tag className="w-3 h-3 text-sky-400" />
+              <span>Labels: <strong className="text-white uppercase">{labelMode}</strong></span>
+            </button>
           </div>
 
-          {/* Right Controls: Auto-Rotate, Reset & Close */}
-          <div className="flex items-center space-x-2">
+          {/* Right Action Controls: Orbit, Flyover, Reset & Close */}
+          <div className="flex items-center space-x-1.5">
             {/* Auto-Rotate Orbit Button */}
             <button
               onClick={() => {
@@ -734,9 +928,9 @@ export default function Terrain3DModal({
                 sfx.playBlip();
               }}
               title="Toggle Cinematic 360° Auto-Rotate Orbit"
-              className={`px-2.5 py-1.5 rounded border transition-colors flex items-center space-x-1 text-[11px] ${
+              className={`px-2 py-1 rounded border transition-colors flex items-center space-x-1 text-[11px] ${
                 isAutoRotating
-                  ? 'bg-sky-500 text-black font-bold border-sky-400 shadow-lg shadow-sky-500/30'
+                  ? 'bg-sky-500 text-black font-bold border-sky-400 shadow-md'
                   : 'bg-[#22252c] text-[#A6A8AD] border-[#33363D] hover:text-white'
               }`}
             >
@@ -744,7 +938,7 @@ export default function Terrain3DModal({
               <span>{isAutoRotating ? 'ORBITING...' : 'ORBIT 360°'}</span>
             </button>
 
-            {/* Flyover Traverse Camera Button */}
+            {/* Flyover Camera Button */}
             {activeRoute && (
               <button
                 onClick={() => {
@@ -752,7 +946,7 @@ export default function Terrain3DModal({
                   sfx.playBlip();
                 }}
                 title="Cinematic camera flyover following the 3D traverse"
-                className={`px-2.5 py-1.5 rounded border transition-colors flex items-center space-x-1 text-[11px] ${
+                className={`px-2 py-1 rounded border transition-colors flex items-center space-x-1 text-[11px] ${
                   isFlyingOver
                     ? 'bg-amber-500 text-black font-bold border-amber-400'
                     : 'bg-[#22252c] text-[#A6A8AD] border-[#33363D] hover:text-white'
@@ -763,67 +957,99 @@ export default function Terrain3DModal({
               </button>
             )}
 
-            {/* Reset Camera View */}
+            {/* Reset Camera Button */}
             <button
               onClick={() => {
                 if (controlsRef.current && cameraRef.current) {
-                  cameraRef.current.position.set(0, 60, 80);
+                  cameraRef.current.position.set(0, 58, 76);
                   controlsRef.current.target.set(0, 0, 0);
                   controlsRef.current.update();
                   setIsFlyingOver(false);
                   sfx.playBlip();
                 }
               }}
-              title="Reset Camera to Top Overview"
-              className="px-2 py-1.5 rounded bg-[#22252c] text-[#A6A8AD] border border-[#33363D] hover:text-white text-[11px]"
+              title="Reset Camera View to Top Angle"
+              className="px-2 py-1 rounded bg-[#22252c] text-[#A6A8AD] border border-[#33363D] hover:text-white text-[11px]"
             >
-              Reset
+              Reset Cam
             </button>
 
-            {/* Close Button */}
+            {/* Close Modal Button */}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg bg-[#22252c] hover:bg-rose-950/60 text-[#A6A8AD] hover:text-rose-300 border border-[#33363D] transition-colors ml-1"
+              className="p-1 rounded-lg bg-[#22252c] hover:bg-rose-950/60 text-[#A6A8AD] hover:text-rose-300 border border-[#33363D] transition-colors ml-1"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* 3D Mission Planning Bar: Presets & Compute Route inside 3D View */}
+        {/* Mission Planning Bar: Origin / Target Waypoints, Presets & Compute Route */}
         <div className="bg-[#14161a] border-b border-[#33363D] px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 z-10 font-mono text-xs">
+          {/* Waypoint Coordinates & Status */}
           <div className="flex items-center space-x-2 flex-wrap">
-            <span className="text-[#A6A8AD] text-[10px] uppercase font-bold flex items-center space-x-1">
-              <Compass className="w-3.5 h-3.5 text-[#D97745]" />
-              <span>3D Traversal Presets:</span>
-            </span>
+            <div className="bg-[#191b20] border border-[#33363D] px-2.5 py-1 rounded text-[11px] flex items-center space-x-2">
+              <div className="flex items-center space-x-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-[#A6A8AD]">ORIGIN:</span>
+                <span className="text-white font-bold">
+                  {startPoint ? `${startPoint.lat}°, ${startPoint.lng}°` : 'Click Terrain'}
+                </span>
+              </div>
+              <div className="w-[1px] h-3 bg-[#33363D]"></div>
+              <div className="flex items-center space-x-1">
+                <span className="w-2 h-2 rounded-full bg-[#D97745] animate-pulse"></span>
+                <span className="text-[#A6A8AD]">TARGET:</span>
+                <span className="text-white font-bold">
+                  {destPoint ? `${destPoint.lat}°, ${destPoint.lng}°` : 'Click Terrain'}
+                </span>
+              </div>
+              {(startPoint || destPoint || activeRoute) && (
+                <button
+                  onClick={handleReset3DPoints}
+                  title="Clear Origin & Target"
+                  className="ml-1 text-[10px] text-rose-400 hover:text-rose-300 px-1 py-0.5 rounded bg-[#22252c] border border-[#33363D]"
+                >
+                  RESET
+                </button>
+              )}
+            </div>
 
-            <select
-              onChange={(e) => {
-                if (e.target.value) handleApplyPresetIn3D(e.target.value);
-              }}
-              defaultValue=""
-              className="bg-[#191b20] border border-[#33363D] text-[#F3F3F3] text-[11px] rounded px-2 py-1 outline-none hover:border-[#D97745] transition-colors cursor-pointer"
-            >
-              <option value="" disabled>Select Mission Traversal...</option>
-              {PRESETS.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-
+            {/* Compute Path Button */}
             <button
               onClick={() => handleCompute3DRoute()}
-              disabled={isCalculating}
-              className="bg-[#D97745] hover:bg-[#B85C38] text-white px-3 py-1 rounded font-bold text-[11px] shadow-lg flex items-center space-x-1 transition-all transform active:scale-95 whitespace-nowrap"
+              disabled={isCalculating || !startPoint || !destPoint}
+              className={`px-3 py-1 rounded font-bold text-[11px] shadow-lg flex items-center space-x-1 transition-all ${
+                startPoint && destPoint
+                  ? 'bg-[#D97745] hover:bg-[#B85C38] text-white active:scale-95'
+                  : 'bg-[#22252c] text-[#777] border border-[#33363D] cursor-not-allowed'
+              }`}
             >
               <Play className={`w-3 h-3 ${isCalculating ? 'animate-spin' : ''}`} />
               <span>{isCalculating ? 'CALCULATING 3D...' : 'COMPUTE 3D PATH'}</span>
             </button>
+
+            {/* Presets Dropdown */}
+            <div className="flex items-center space-x-1 bg-[#191b20] border border-[#33363D] rounded px-1.5 py-0.5">
+              <Compass className="w-3 h-3 text-[#D97745]" />
+              <select
+                onChange={(e) => {
+                  if (e.target.value) handleApplyPresetIn3D(e.target.value);
+                }}
+                defaultValue=""
+                className="bg-transparent text-[#F3F3F3] text-[10px] outline-none cursor-pointer"
+              >
+                <option value="" disabled>Apply Preset Traversal...</option>
+                {PRESETS.map(p => (
+                  <option key={p.id} value={p.id} className="bg-[#191b20]">{p.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Quick Landmark Teleport Buttons */}
           <div className="flex items-center space-x-1 overflow-x-auto py-0.5">
-            <span className="text-[#A6A8AD] text-[9px] uppercase hidden lg:inline mr-1">Focus Landmark:</span>
+            <span className="text-[#A6A8AD] text-[9px] uppercase hidden xl:inline mr-1">Focus Landmark:</span>
             {LANDMARKS.map(lm => (
               <button
                 key={lm.id}
@@ -837,9 +1063,9 @@ export default function Terrain3DModal({
           </div>
         </div>
 
-        {/* WebGL 3D Viewport Canvas */}
-        <div className="relative flex-1 w-full h-full">
-          <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+        {/* WebGL 3D Viewport Canvas Container */}
+        <div className="relative flex-1 w-full min-h-0 overflow-hidden">
+          <div ref={mountRef} className="w-full h-full cursor-crosshair active:cursor-grabbing" />
 
           {/* Loading Indicator */}
           {isLoading && (
@@ -847,16 +1073,29 @@ export default function Terrain3DModal({
               <div className="p-4 rounded-xl bg-[#191b20] border border-[#33363D] text-center space-y-2 font-mono text-xs">
                 <Box className="w-6 h-6 text-[#D97745] animate-bounce mx-auto" />
                 <div className="text-white font-bold">Constructing 3D Jezero Crater Mesh...</div>
-                <div className="text-[#A6A8AD] text-[10px]">Sampling 20m CTX DTM elevation heights</div>
+                <div className="text-[#A6A8AD] text-[10px]">Displacing vertices with authentic 20m CTX DTM elevation</div>
               </div>
             </div>
           )}
 
-          {/* Floating Telemetry & Exaggeration Controls (Bottom Left) */}
-          <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-2 font-mono text-xs pointer-events-none max-w-sm">
+          {/* Toast Notification Banner */}
+          {feedbackNotice && (
+            <div className={`absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-lg text-xs font-mono shadow-2xl backdrop-blur-md border ${
+              feedbackNotice.type === 'error'
+                ? 'bg-rose-950/90 border-rose-500 text-rose-200'
+                : feedbackNotice.type === 'warning'
+                ? 'bg-amber-950/90 border-amber-500 text-amber-200'
+                : 'bg-[#191b20]/95 border-emerald-500/50 text-emerald-300'
+            }`}>
+              {feedbackNotice.text}
+            </div>
+          )}
+
+          {/* Bottom Left: Route Telemetry & Exaggeration Controls */}
+          <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-2 font-mono text-xs pointer-events-none max-w-sm max-h-[40vh] overflow-y-auto">
             {/* Active 3D Route Telemetry Card */}
             {activeRoute?.route && (
-              <div className="bg-[#191b20]/95 backdrop-blur-md border border-emerald-500/40 rounded-lg p-2.5 shadow-2xl pointer-events-auto space-y-1.5 animate-in fade-in duration-300">
+              <div className="bg-[#191b20]/95 backdrop-blur-md border border-emerald-500/40 rounded-lg p-2.5 shadow-2xl pointer-events-auto space-y-1.5">
                 <div className="flex items-center justify-between pb-1 border-b border-[#33363D]">
                   <div className="flex items-center space-x-1.5 text-emerald-400 font-bold text-[11px]">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -871,17 +1110,17 @@ export default function Terrain3DModal({
                   <div>Descent: <strong className="text-sky-400">−{activeRoute.elevation_loss_m ?? 0}m</strong></div>
                 </div>
                 <div className="text-[9px] text-[#A6A8AD] pt-0.5 border-t border-[#33363D]/60 leading-tight">
-                  Traverse displayed as elevated green neon spline through Jezero Delta.
+                  Conforms to 3D Martian terrain topography with cost-weighted slope steering.
                 </div>
               </div>
             )}
 
             {/* Vertical Exaggeration Slider */}
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-2.5 shadow-xl pointer-events-auto space-y-1.5 w-64">
+            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-2 shadow-xl pointer-events-auto space-y-1 w-60">
               <div className="flex justify-between items-center text-[10px]">
                 <span className="text-[#A6A8AD] uppercase font-bold flex items-center space-x-1">
                   <Sliders className="w-3 h-3 text-[#D97745]" />
-                  <span>Vertical Relief Exaggeration</span>
+                  <span>Relief Exaggeration</span>
                 </span>
                 <span className="text-white font-bold">{exaggeration}x</span>
               </div>
@@ -902,9 +1141,9 @@ export default function Terrain3DModal({
             </div>
           </div>
 
-          {/* Selected Landmark Info Card (Bottom Right) */}
+          {/* Bottom Right: Selected Landmark Info Card */}
           {selectedLandmark && (
-            <div className="absolute bottom-4 right-4 z-10 pointer-events-auto max-w-xs bg-[#191b20]/95 backdrop-blur-md border rounded-lg p-3 font-mono shadow-2xl space-y-1 animate-in fade-in duration-200" style={{ borderColor: selectedLandmark.color }}>
+            <div className="absolute bottom-3 right-3 z-10 pointer-events-auto max-w-xs bg-[#191b20]/95 backdrop-blur-md border rounded-lg p-3 font-mono shadow-2xl space-y-1 max-h-[40vh] overflow-y-auto" style={{ borderColor: selectedLandmark.color }}>
               <div className="flex items-center justify-between pb-1 border-b border-[#33363D]">
                 <div className="flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: selectedLandmark.color }}></span>
@@ -912,7 +1151,7 @@ export default function Terrain3DModal({
                 </div>
                 <button
                   onClick={() => setSelectedLandmark(null)}
-                  className="text-[#A6A8AD] hover:text-white text-xs"
+                  className="text-[#A6A8AD] hover:text-white text-xs p-0.5"
                 >
                   ✕
                 </button>
@@ -922,33 +1161,40 @@ export default function Terrain3DModal({
               <div className="flex space-x-1.5 pt-2 border-t border-[#33363D]">
                 <button
                   onClick={() => {
-                    setStartPoint({ lat: selectedLandmark.lat, lng: selectedLandmark.lng });
+                    const geo = { lat: selectedLandmark.lat, lng: selectedLandmark.lng };
+                    setStartPoint(geo);
+                    if (onSelectWaypoint) onSelectWaypoint('start', geo);
+                    updateWaypointBeacons(geo, destPoint, sceneRef.current, heightDataRef.current, exaggeration);
                     sfx.playBlip();
                   }}
-                  className="flex-1 bg-emerald-600/80 hover:bg-emerald-600 text-white py-1 rounded text-[9px] font-bold"
+                  className="flex-1 bg-emerald-600/80 hover:bg-emerald-600 text-white py-1 rounded text-[9px] font-bold transition-colors"
                 >
-                  Set as Origin
+                  Set Origin
                 </button>
                 <button
                   onClick={() => {
-                    setDestPoint({ lat: selectedLandmark.lat, lng: selectedLandmark.lng });
+                    const geo = { lat: selectedLandmark.lat, lng: selectedLandmark.lng };
+                    setDestPoint(geo);
+                    if (onSelectWaypoint) onSelectWaypoint('destination', geo);
+                    updateWaypointBeacons(startPoint, geo, sceneRef.current, heightDataRef.current, exaggeration);
                     sfx.playBlip();
                   }}
-                  className="flex-1 bg-[#D97745]/80 hover:bg-[#D97745] text-white py-1 rounded text-[9px] font-bold"
+                  className="flex-1 bg-[#D97745]/80 hover:bg-[#D97745] text-white py-1 rounded text-[9px] font-bold transition-colors"
                 >
-                  Set as Target
+                  Set Target
                 </button>
               </div>
             </div>
           )}
 
-          {/* Camera Navigation Tips HUD (Top Right) */}
-          <div className="absolute top-4 right-4 z-10 hidden sm:block pointer-events-none">
-            <div className="bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg p-2.5 font-mono text-[10px] text-[#A6A8AD] shadow-xl space-y-1">
-              <div className="text-white font-bold text-[9px] uppercase border-b border-[#33363D] pb-0.5 mb-1 flex items-center space-x-1">
-                <Navigation className="w-3 h-3 text-[#38BDF8]" />
-                <span>3D Navigation Controls</span>
+          {/* Top Right: Navigation Tips HUD */}
+          <div className="absolute top-3 right-3 z-10 hidden sm:block pointer-events-none">
+            <div className="bg-[#191b20]/90 backdrop-blur-md border border-[#33363D] rounded-lg p-2 font-mono text-[9px] text-[#A6A8AD] shadow-xl space-y-0.5">
+              <div className="text-white font-bold uppercase border-b border-[#33363D] pb-0.5 mb-1 flex items-center space-x-1">
+                <Navigation className="w-2.5 h-2.5 text-[#38BDF8]" />
+                <span>3D Interaction Guide</span>
               </div>
+              <div>• <strong>Click Terrain:</strong> Drop Origin / Target Waypoints</div>
               <div>• <strong>Left Click + Drag:</strong> 360° Orbit &amp; Pitch</div>
               <div>• <strong>Right Click + Drag:</strong> Pan Terrain</div>
               <div>• <strong>Scroll Wheel:</strong> Zoom In / Out</div>
