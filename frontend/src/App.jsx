@@ -219,7 +219,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#101114] text-[#F3F3F3] overflow-hidden select-none">
-      <Header backendStatus={backendStatus} activeTab={activeTab} />
+      <Header backendStatus={backendStatus} activeTab={activeTab} destinationPoint={destinationPoint} />
 
       <div className="flex flex-1 overflow-hidden">
         <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />

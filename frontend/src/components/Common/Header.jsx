@@ -1,7 +1,7 @@
 import React from 'react';
 import { Compass, Radio, ShieldAlert, Cpu } from 'lucide-react';
 
-export default function Header({ backendStatus, activeTab }) {
+export default function Header({ backendStatus, activeTab, destinationPoint }) {
   const isOnline = backendStatus && backendStatus.status === 'ok';
 
   return (
@@ -22,9 +22,16 @@ export default function Header({ backendStatus, activeTab }) {
       </div>
 
       <div className="flex items-center space-x-6 text-xs font-mono">
-        <div className="hidden sm:flex items-center space-x-2 text-[#A6A8AD]">
-          <span>TARGET:</span>
-          <span className="text-[#F3F3F3]">18.38° N, 77.58° E</span>
+        <div className="hidden sm:flex items-center space-x-1.5 text-[#A6A8AD]">
+          <span className={destinationPoint ? "text-[#D97745] font-semibold" : "text-[#A6A8AD]"}>TARGET:</span>
+          <span className="text-[#F3F3F3] font-mono">
+            {destinationPoint 
+              ? `${destinationPoint.lat}° N, ${destinationPoint.lng}° E` 
+              : '18.38° N, 77.58° E'}
+          </span>
+          {destinationPoint && (
+            <span className="w-1.5 h-1.5 rounded-full bg-[#D97745] animate-pulse"></span>
+          )}
         </div>
 
         <div className="flex items-center space-x-2 px-2.5 py-1 rounded bg-[#22252c] border border-[#33363D]">
