@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import rasterio
 from pathlib import Path
@@ -41,7 +40,6 @@ class TerrainProcessor:
         dtm_path = self._resolve_dtm_path()
 
         with rasterio.open(dtm_path) as src:
-            self._dtm_dataset = src
             self._transform = src.transform
             self._res = src.res
             self._nodata = src.nodata
@@ -253,7 +251,13 @@ class TerrainProcessor:
             "estimated_difficulty": result["estimated_difficulty"],
             "elevation_gain_m": result["elevation_gain_m"],
             "elevation_loss_m": result["elevation_loss_m"],
+            "mean_slope_deg": result["mean_slope_deg"],
             "max_slope_deg": result["max_slope_deg"],
+            "under_15_deg_pct": result.get("under_15_deg_pct"),
+            "estimated_traverse_time_hours": result.get("estimated_traverse_time_hours"),
+            "direct_distance_km": result.get("direct_distance_km"),
+            "direct_max_slope_deg": result.get("direct_max_slope_deg"),
+            "hazard_warning": result.get("hazard_warning"),
             "assumptions": result["assumptions"]
         }
 

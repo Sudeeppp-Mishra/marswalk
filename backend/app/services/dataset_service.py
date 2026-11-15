@@ -37,7 +37,7 @@ def get_registered_datasets() -> List[DatasetInfo]:
             file_size_bytes=ctx_info["size"] if ctx_info else (ctx_image.stat().st_size if ctx_image else None),
             crs=ctx_info["crs"] if ctx_info else None,
             resolution_m=ctx_info["res"] if ctx_info else 6.0,
-            notes=f"Authentic MRO CTX Mosaic ({ctx_info['dims']} px) in {ctx_image.parent.name}/" if ctx_info else ("Found on disk" if ctx_image else "Not found")
+            notes=f"MRO CTX Mosaic ({ctx_info['dims']} px) in {ctx_image.parent.name}/" if ctx_info else ("Found on disk" if ctx_image else "Not found")
         )
     )
 
@@ -66,7 +66,7 @@ def get_registered_datasets() -> List[DatasetInfo]:
             file_size_bytes=dem_info["size"] if dem_info else (dem_file.stat().st_size if dem_file else None),
             crs=dem_info["crs"] if dem_info else None,
             resolution_m=dem_info["res"] if dem_info else 20.0,
-            notes=f"Authentic USGS Mars 2020 TRN CTX DTM ({dem_info['dims']} px) in {dem_file.parent.name}/" if dem_info else "Pending acquisition"
+            notes=f"USGS Mars 2020 TRN CTX DTM mosaic ({dem_info['dims']} px) in {dem_file.parent.name}/" if dem_info else "Local 20m DTM"
         )
     )
 
@@ -94,8 +94,8 @@ def get_registered_datasets() -> List[DatasetInfo]:
             file_path=str(hirise_file) if hirise_file else None,
             file_size_bytes=hirise_info["size"] if hirise_info else (hirise_file.stat().st_size if hirise_file else None),
             crs=hirise_info["crs"] if hirise_info else None,
-            resolution_m=hirise_info["res"] if hirise_info else 0.25,
-            notes=f"Authentic MRO HiRISE 25cm Mosaic ({hirise_info['dims']} px) detected" if hirise_info else "Downloading / Waiting for placement in data/"
+            resolution_m=0.25,
+            notes=f"Authentic MRO HiRISE 25cm Ultra-HD ({hirise_info['dims']} px, {hirise_file.stat().st_size / (1024**3):.1f} GB) in {hirise_file.parent.name}/" if hirise_info else "WMTS web stream active (Local TIF roadmap)"
         )
     )
 

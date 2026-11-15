@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from fastapi.responses import FileResponse
+import logging
 from ..models.schemas import (
     HealthResponse, 
     DatasetsResponse, 
@@ -10,9 +11,11 @@ from ..models.schemas import (
 )
 from ..services.dataset_service import get_registered_datasets
 from ..services.geology_service import get_geology_data
+from ..services.hirise_service import get_hirise_crop_png, get_hirise_landmarks, get_hirise_file_path
 from ..processing.terrain_processor import terrain_engine, JEZERO_BOUNDS_DEG
 from ..core.config import PROJECT_NAME, TARGET_REGION, PROJECT_VERSION, PROCESSED_DATA_DIR
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/health", response_model=HealthResponse)
@@ -53,6 +56,7 @@ async def get_terrain_at_point(
             risk_tier=sample.get("risk_tier")
         )
     except Exception as e:
+        logger.warning(f"Terrain point query failed at ({lat}, {lng}): {e}")
         return TerrainPointResponse(
             valid=False,
             lat=lat,
@@ -102,6 +106,35 @@ async def get_terrain_overlay(overlay_type: str):
     return FileResponse(overlay_path, media_type="image/png")
 
 
+@router.get("/terrain/hirise/crop")
+async def get_hirise_crop(
+    lat: float = Query(..., ge=-90.0, le=90.0, description="Latitude in degrees"),
+    lng: float = Query(..., ge=-180.0, le=180.0, description="Longitude in degrees"),
+    radius_m: float = Query(150.0, ge=20.0, le=1000.0, description="Inspection aperture radius in ground meters"),
+    size: int = Query(512, ge=128, le=1024, description="Output pixel resolution")
+):
+    """
+    Serves authentic 25cm/pixel ultra-HD ground crops from the local 9.1GB HiRISE GeoTIFF.
+    Performs memory-safe sub-window extraction with percentile contrast stretching.
+    """
+    crop_bytes = get_hirise_crop_png(lat=lat, lng=lng, radius_m=radius_m, output_size=size)
+    if not crop_bytes:
+        raise HTTPException(status_code=404, detail="Coordinates outside HiRISE coverage or file unavailable.")
+
+    return Response(content=crop_bytes, media_type="image/png")
+
+
+@router.get("/terrain/hirise/landmarks")
+async def get_hirise_landmarks_endpoint():
+    """Returns curated Jezero Crater scientific landmarks for 25cm ultra-HD inspection."""
+    hirise_path = get_hirise_file_path()
+    return {
+        "available": hirise_path is not None and hirise_path.exists(),
+        "file_name": hirise_path.name if hirise_path else None,
+        "landmarks": get_hirise_landmarks()
+    }
+
+
 @router.post("/route", response_model=RouteResponse)
 async def calculate_route(request: RouteRequest):
     """
@@ -126,7 +159,13 @@ async def calculate_route(request: RouteRequest):
         estimated_difficulty=result.get("estimated_difficulty", "unknown"),
         elevation_gain_m=result.get("elevation_gain_m"),
         elevation_loss_m=result.get("elevation_loss_m"),
+        mean_slope_deg=result.get("mean_slope_deg"),
         max_slope_deg=result.get("max_slope_deg"),
+        under_15_deg_pct=result.get("under_15_deg_pct"),
+        estimated_traverse_time_hours=result.get("estimated_traverse_time_hours"),
+        direct_distance_km=result.get("direct_distance_km"),
+        direct_max_slope_deg=result.get("direct_max_slope_deg"),
+        hazard_warning=result.get("hazard_warning"),
         assumptions=result.get("assumptions", [])
     )
 

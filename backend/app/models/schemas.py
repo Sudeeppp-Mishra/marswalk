@@ -57,6 +57,12 @@ class RouteResponse(BaseModel):
     estimated_difficulty: str = "unknown"
     elevation_gain_m: Optional[float] = None
     elevation_loss_m: Optional[float] = None
+    mean_slope_deg: Optional[float] = None
     max_slope_deg: Optional[float] = None
+    under_15_deg_pct: Optional[float] = None
+    estimated_traverse_time_hours: Optional[float] = None
+    direct_distance_km: Optional[float] = None
+    direct_max_slope_deg: Optional[float] = None
+    hazard_warning: Optional[str] = None
     assumptions: List[str] = Field(default_factory=list)
 
