@@ -280,6 +280,19 @@ export default function MarsMap({
     } catch (e) {}
   }, []);
 
+  // Synchronize start, destination, and slope into browser URL for shareable links
+  useEffect(() => {
+    try {
+      if (startPoint && destinationPoint) {
+        const url = new URL(window.location);
+        url.searchParams.set('start', `${startPoint.lat.toFixed(5)},${startPoint.lng.toFixed(5)}`);
+        url.searchParams.set('dest', `${destinationPoint.lat.toFixed(5)},${destinationPoint.lng.toFixed(5)}`);
+        url.searchParams.set('slope', maxSlope);
+        window.history.replaceState({}, '', url);
+      }
+    } catch (e) {}
+  }, [startPoint, destinationPoint, maxSlope]);
+
   const [geologyData, setGeologyData] = useState(DEFAULT_GEOLOGY_DATA);
   const [isCalculating, setIsCalculating] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState(null);
@@ -583,33 +596,49 @@ export default function MarsMap({
   // 5 Authentic Perseverance presets with real rover landing & science targets
   const handleApplyPreset = (presetKey) => {
     sfx.playBlip();
+    let s = null, d = null, title = '';
     if (presetKey === 'perseverance_to_kodiak') {
-      onSelectPoint('start', { lat: 18.4447, lng: 77.4508 });
-      onSelectPoint('destination', { lat: 18.4231, lng: 77.4125 });
-      setRouteData(null);
-      setFeedbackMsg({ type: 'info', text: 'Preset 1: Landing Site to Kodiak Butte Delta Remnant.' });
+      s = { lat: 18.4447, lng: 77.4508 };
+      d = { lat: 18.4231, lng: 77.4125 };
+      title = 'Preset 1: Landing Site to Kodiak Butte Delta Remnant';
     } else if (presetKey === 'three_forks_to_wildcat') {
-      onSelectPoint('start', { lat: 18.4352, lng: 77.4208 });
-      onSelectPoint('destination', { lat: 18.4412, lng: 77.4081 });
-      setRouteData(null);
-      setFeedbackMsg({ type: 'info', text: 'Preset 2: Three Forks Sample Depot to Wildcat Ridge.' });
+      s = { lat: 18.4352, lng: 77.4208 };
+      d = { lat: 18.4412, lng: 77.4081 };
+      title = 'Preset 2: Three Forks Sample Depot to Wildcat Ridge';
     } else if (presetKey === 'seitah_traversal') {
-      onSelectPoint('start', { lat: 18.4265, lng: 77.4420 });
-      onSelectPoint('destination', { lat: 18.4310, lng: 77.4285 });
-      setRouteData(null);
-      setFeedbackMsg({ type: 'info', text: 'Preset 3: South Séítah Olivine Cumulate to Artuby Ridge.' });
+      s = { lat: 18.4265, lng: 77.4420 };
+      d = { lat: 18.4310, lng: 77.4285 };
+      title = 'Preset 3: South Séítah Olivine Cumulate to Artuby Ridge';
     } else if (presetKey === 'delta_top_ascent') {
-      onSelectPoint('start', { lat: 18.4412, lng: 77.4081 });
-      onSelectPoint('destination', { lat: 18.4550, lng: 77.3820 });
-      setRouteData(null);
-      setFeedbackMsg({ type: 'info', text: 'Preset 4: Delta Scarp Incline to Belva Crater Overlook.' });
+      s = { lat: 18.4412, lng: 77.4081 };
+      d = { lat: 18.4550, lng: 77.3820 };
+      title = 'Preset 4: Delta Scarp Incline to Belva Crater Overlook';
     } else if (presetKey === 'neretva_vallis_inflow') {
-      onSelectPoint('start', { lat: 18.4550, lng: 77.3820 });
-      onSelectPoint('destination', { lat: 18.4720, lng: 77.3350 });
-      setRouteData(null);
-      setFeedbackMsg({ type: 'info', text: 'Preset 5: Upper Delta Terrace to Neretva Canyon Inflow.' });
+      s = { lat: 18.4550, lng: 77.3820 };
+      d = { lat: 18.4720, lng: 77.3350 };
+      title = 'Preset 5: Upper Delta Terrace to Neretva Canyon Inflow';
     }
-    setTimeout(() => setFeedbackMsg(null), 3500);
+
+    if (s && d) {
+      onSelectPoint('start', s);
+      onSelectPoint('destination', d);
+      setFeedbackMsg({ type: 'info', text: `${title}: Calculating traverse path...` });
+      setIsCalculating(true);
+      calculateRoute(s, d, maxSlope).then(res => {
+        setIsCalculating(false);
+        if (res && res.status === 'success') {
+          setRouteData(res);
+          sfx.playSuccess();
+          setFeedbackMsg({ type: 'success', text: `${title}: Route computed (${res.distance_km} km)` });
+        } else {
+          setFeedbackMsg({ type: 'error', text: res?.error || 'Path blocked by steep terrain hazards.' });
+        }
+      }).catch(() => {
+        setIsCalculating(false);
+        setFeedbackMsg({ type: 'error', text: 'Route calculation failed.' });
+      });
+    }
+    setTimeout(() => setFeedbackMsg(null), 4000);
   };
 
   const polylineCoords = useMemo(() => {

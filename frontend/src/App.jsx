@@ -4,7 +4,7 @@ import Navigation from './components/Sidebar/Navigation';
 import MarsMap from './components/Map/MarsMap';
 import StatusPanel from './components/Common/StatusPanel';
 import BottomBar from './components/Common/BottomBar';
-import { checkBackendHealth, getDatasets } from './services/api';
+import { checkBackendHealth, getDatasets, calculateRoute } from './services/api';
 import { 
   Compass, 
   Mountain, 
@@ -39,16 +39,25 @@ export default function App() {
       const destParam = params.get('dest');
       const slopeParam = params.get('slope') || params.get('max_slope');
 
+      let parsedSlope = 20.0;
       if (slopeParam && !isNaN(parseFloat(slopeParam))) {
-        setMaxSlope(parseFloat(slopeParam));
+        parsedSlope = parseFloat(slopeParam);
+        setMaxSlope(parsedSlope);
       }
 
       if (startParam && destParam) {
         const [sLat, sLng] = startParam.split(',').map(Number);
         const [dLat, dLng] = destParam.split(',').map(Number);
         if (!isNaN(sLat) && !isNaN(sLng) && !isNaN(dLat) && !isNaN(dLng)) {
-          setStartPoint({ lat: sLat, lng: sLng });
-          setDestinationPoint({ lat: dLat, lng: dLng });
+          const s = { lat: sLat, lng: sLng };
+          const d = { lat: dLat, lng: dLng };
+          setStartPoint(s);
+          setDestinationPoint(d);
+          calculateRoute(s, d, parsedSlope).then(res => {
+            if (res && res.status === 'success') {
+              setRouteData(res);
+            }
+          }).catch(console.warn);
         }
       }
     } catch (e) {
