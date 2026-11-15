@@ -54,7 +54,7 @@ import MapLegendBar from './MapLegendBar';
 import GeologyLegendBar from './GeologyLegendBar';
 import HiRISEInspectorModal from './HiRISEInspectorModal';
 import Terrain3DModal from './Terrain3DModal';
-import FirstTimeGuideModal from '../Common/FirstTimeGuideModal';
+import InUIGuideTour from '../Common/InUIGuideTour';
 
 const JEZERO_BOUNDS = [
   [18.2110274, 77.1604655],
@@ -1718,12 +1718,17 @@ export default function MarsMap({
         </div>
       )}
 
-      {/* Interactive 3-Step Walkthrough Guide for Hackathon Judges */}
-      <FirstTimeGuideModal
-        isOpen={showGuideModal}
+      {/* Interactive In-UI Guided Tour Dock for Hackathon Judges */}
+      <InUIGuideTour
+        isActive={showGuideModal}
         onClose={() => setShowGuideModal(false)}
         onApplyPreset={handleApplyPreset}
         onComputeRoute={handleComputeRoute}
+        onSetActiveLayer={(layer) => setActiveLayer(layer)}
+        onOpen3D={() => setIs3DModalOpen(true)}
+        onToggleSim={() => {
+          setSimState(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
+        }}
       />
 
       {/* EVA Mission Dispatch Dossier Modal */}
