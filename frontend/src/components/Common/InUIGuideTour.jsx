@@ -90,6 +90,33 @@ const TOUR_STEPS = [
   }
 ];
 
+const TOUR_POSITIONS = {
+  presets: {
+    container: 'top-[96px] left-3 sm:left-4',
+    arrow: 'top-[-8px] left-10 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+  },
+  mode_compute: {
+    container: 'top-16 right-3 sm:right-6',
+    arrow: 'top-[-8px] right-20 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+  },
+  layers: {
+    container: 'top-16 left-3 sm:left-24 md:left-40',
+    arrow: 'top-[-8px] left-24 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+  },
+  comparison_geology: {
+    container: 'top-20 right-3 sm:right-6',
+    arrow: 'top-[-8px] right-8 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+  },
+  micro_3d: {
+    container: 'top-16 left-3 sm:left-16 md:left-28',
+    arrow: 'top-[-8px] left-20 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+  },
+  simulation_export: {
+    container: 'top-[96px] right-3 sm:right-6',
+    arrow: 'top-[-8px] right-24 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
+  }
+};
+
 export default function InUIGuideTour({
   isActive,
   onClose,
@@ -97,13 +124,17 @@ export default function InUIGuideTour({
   onComputeRoute,
   onSetActiveLayer,
   onOpen3D,
-  onToggleSim
+  onToggleSim,
+  onStepChange
 }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   useEffect(() => {
     if (isActive) {
       setCurrentStepIndex(0);
+      if (onStepChange) onStepChange(1);
+    } else {
+      if (onStepChange) onStepChange(null);
     }
   }, [isActive]);
 
@@ -111,11 +142,14 @@ export default function InUIGuideTour({
 
   const currentStep = TOUR_STEPS[currentStepIndex];
   const StepIcon = currentStep.icon;
+  const positionConfig = TOUR_POSITIONS[currentStep.target] || TOUR_POSITIONS.presets;
 
   const handleNext = () => {
     sfx.playBlip();
     if (currentStepIndex < TOUR_STEPS.length - 1) {
-      setCurrentStepIndex(prev => prev + 1);
+      const nextIdx = currentStepIndex + 1;
+      setCurrentStepIndex(nextIdx);
+      if (onStepChange) onStepChange(TOUR_STEPS[nextIdx].step);
     } else {
       handleComplete();
     }
@@ -124,7 +158,9 @@ export default function InUIGuideTour({
   const handlePrev = () => {
     sfx.playBlip();
     if (currentStepIndex > 0) {
-      setCurrentStepIndex(prev => prev - 1);
+      const prevIdx = currentStepIndex - 1;
+      setCurrentStepIndex(prevIdx);
+      if (onStepChange) onStepChange(TOUR_STEPS[prevIdx].step);
     }
   };
 
@@ -133,6 +169,7 @@ export default function InUIGuideTour({
     try {
       localStorage.setItem('has_seen_marswalk_guide', 'true');
     } catch (e) {}
+    if (onStepChange) onStepChange(null);
     onClose();
   };
 
@@ -152,11 +189,20 @@ export default function InUIGuideTour({
   };
 
   return (
-    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[1500] w-[94%] max-w-xl pointer-events-auto animate-in slide-in-from-bottom-5 duration-300 font-mono select-none">
-      {/* Sleek In-UI Floating Card */}
-      <div className="relative bg-[#191b20]/95 backdrop-blur-xl border border-[#33363D] rounded-xl shadow-2xl p-4 overflow-hidden" style={{ borderColor: `${currentStep.color}80` }}>
+    <div className={`absolute ${positionConfig.container} z-[1500] w-[94vw] sm:w-[440px] md:w-[460px] pointer-events-auto transition-all duration-300 font-mono select-none`}>
+      {/* Semi-transparent Frosted Aerospace Card */}
+      <div 
+        className="relative bg-[#121418]/75 backdrop-blur-md border rounded-xl shadow-2xl p-3.5 overflow-hidden transition-all duration-300" 
+        style={{ borderColor: `${currentStep.color}90`, boxShadow: `0 10px 30px -5px ${currentStep.color}25` }}
+      >
+        {/* Anchor Arrow pointing to targeted button */}
+        <div 
+          className={`absolute w-0 h-0 ${positionConfig.arrow}`}
+          style={{ borderBottomColor: currentStep.color }}
+        />
+
         {/* Glowing Top Progress Bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-[#101114]">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-[#101114]/60">
           <div 
             className="h-full transition-all duration-300"
             style={{ 
@@ -167,7 +213,7 @@ export default function InUIGuideTour({
         </div>
 
         {/* Top Header Row */}
-        <div className="flex items-center justify-between pb-2 border-b border-[#33363D]/60 mb-2.5">
+        <div className="flex items-center justify-between pb-2 border-b border-[#33363D]/60 mb-2">
           <div className="flex items-center space-x-2">
             <span 
               className="p-1 rounded flex items-center justify-center text-xs font-bold"
@@ -181,7 +227,7 @@ export default function InUIGuideTour({
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="text-[10px] text-[#A6A8AD] bg-[#14161a] px-2 py-0.5 rounded border border-[#33363D]">
+            <span className="text-[10px] text-[#A6A8AD] bg-[#14161a]/80 px-2 py-0.5 rounded border border-[#33363D]">
               STEP {currentStep.step} / {TOUR_STEPS.length}
             </span>
             <button
@@ -195,22 +241,22 @@ export default function InUIGuideTour({
         </div>
 
         {/* Step Title & Detailed Description */}
-        <div className="space-y-1.5 mb-3">
-          <h4 className="text-sm font-bold text-white flex items-center space-x-1.5">
+        <div className="space-y-1 mb-2.5">
+          <h4 className="text-xs font-bold text-white flex items-center space-x-1.5">
             <span style={{ color: currentStep.color }}>●</span>
             <span>{currentStep.title}</span>
           </h4>
-          <p className="text-[11px] text-[#A6A8AD] leading-relaxed">
+          <p className="text-[10.5px] text-[#A6A8AD] leading-relaxed">
             {currentStep.description}
           </p>
         </div>
 
         {/* Interactive Action Button for this step (if available) */}
         {currentStep.actionLabel && (
-          <div className="mb-3 p-2 rounded-lg bg-[#101114] border border-[#33363D] flex items-center justify-between">
+          <div className="mb-2.5 p-2 rounded-lg bg-[#0c0e12]/60 backdrop-blur-sm border border-[#33363D]/60 flex items-center justify-between">
             <span className="text-[10px] text-[#A6A8AD] flex items-center space-x-1">
               <Sparkles className="w-3 h-3 text-amber-400" />
-              <span>1-Click Interactive Demo:</span>
+              <span>1-Click Interactive:</span>
             </span>
             <button
               onClick={handleExecuteAction}
@@ -230,11 +276,15 @@ export default function InUIGuideTour({
             {TOUR_STEPS.map((s, idx) => (
               <button
                 key={s.step}
-                onClick={() => { setCurrentStepIndex(idx); sfx.playBlip(); }}
+                onClick={() => { 
+                  setCurrentStepIndex(idx); 
+                  if (onStepChange) onStepChange(s.step);
+                  sfx.playBlip(); 
+                }}
                 title={`Jump to Step ${s.step}: ${s.title}`}
                 className={`transition-all rounded-full ${
                   currentStepIndex === idx
-                    ? 'w-5 h-2 rounded-full'
+                    ? 'w-4 h-2 rounded-full'
                     : 'w-2 h-2 hover:scale-125'
                 }`}
                 style={{ 
@@ -249,7 +299,7 @@ export default function InUIGuideTour({
             {currentStepIndex > 0 ? (
               <button
                 onClick={handlePrev}
-                className="px-2.5 py-1 rounded bg-[#22252c] hover:bg-[#2b2e36] text-[#A6A8AD] hover:text-white border border-[#33363D] text-[11px] font-bold flex items-center space-x-1 transition-colors"
+                className="px-2 py-0.5 rounded bg-[#22252c]/80 hover:bg-[#2b2e36] text-[#A6A8AD] hover:text-white border border-[#33363D] text-[10px] font-bold flex items-center space-x-1 transition-colors"
               >
                 <ArrowLeft className="w-3 h-3" />
                 <span>Prev</span>
@@ -266,7 +316,7 @@ export default function InUIGuideTour({
             {currentStepIndex < TOUR_STEPS.length - 1 ? (
               <button
                 onClick={handleNext}
-                className="px-3 py-1 rounded text-[11px] font-bold text-white flex items-center space-x-1 shadow-md transition-transform active:scale-95"
+                className="px-2.5 py-0.5 rounded text-[11px] font-bold text-white flex items-center space-x-1 shadow-md transition-transform active:scale-95"
                 style={{ backgroundColor: currentStep.color }}
               >
                 <span>Next</span>
@@ -275,10 +325,10 @@ export default function InUIGuideTour({
             ) : (
               <button
                 onClick={handleComplete}
-                className="px-3 py-1 rounded text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 flex items-center space-x-1 shadow-lg shadow-emerald-600/30 transition-transform active:scale-95"
+                className="px-2.5 py-0.5 rounded text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 flex items-center space-x-1 shadow-lg shadow-emerald-600/30 transition-transform active:scale-95"
               >
                 <CheckCircle2 className="w-3 h-3" />
-                <span>Finish Guide</span>
+                <span>Finish</span>
               </button>
             )}
           </div>
@@ -287,3 +337,4 @@ export default function InUIGuideTour({
     </div>
   );
 }
+

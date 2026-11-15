@@ -14,8 +14,8 @@ export default function GeologyLegendBar({ showGeology, hasActiveRoute = false }
   ];
 
   return (
-    <div className={`absolute ${hasActiveRoute ? 'bottom-[142px]' : 'bottom-2'} left-3 z-[1000] pointer-events-auto hidden sm:block transition-all duration-300`}>
-      <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-2 font-mono text-[10px] text-[#F3F3F3] shadow-2xl w-64 space-y-1.5">
+    <div className="absolute bottom-11 right-14 z-[1000] pointer-events-auto hidden sm:block transition-all duration-300">
+      <div className="bg-[#121418]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-2 font-mono text-[10px] text-[#F3F3F3] shadow-2xl w-64 space-y-1.5">
         <div 
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="flex items-center justify-between border-b border-[#33363D] pb-1 cursor-pointer select-none hover:text-amber-300 transition-colors"

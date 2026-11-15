@@ -6,7 +6,7 @@ export default function MapLegendBar({ activeLayer }) {
 
   return (
     <div className="absolute bottom-2 right-14 z-[1000] pointer-events-auto hidden sm:block">
-      <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-2 font-mono text-[10px] text-[#F3F3F3] shadow-xl w-60 space-y-1.5">
+      <div className="bg-[#121418]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-2 font-mono text-[10px] text-[#F3F3F3] shadow-xl w-60 space-y-1.5">
         {activeLayer === 'elevation' && (
           <>
             <div className="flex items-center justify-between text-[#A6A8AD]">

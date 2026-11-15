@@ -269,6 +269,7 @@ export default function MarsMap({
   const [isMeasureMode, setIsMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState([]);
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [activeGuideStep, setActiveGuideStep] = useState(null);
 
   // Automatically display the 3-step walkthrough overlay for first-time judges
   useEffect(() => {
@@ -721,7 +722,7 @@ export default function MarsMap({
           {/* Left Group: Layers and Science Overlays */}
           <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
             {/* Layer Selector */}
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-1 flex items-center space-x-1 shadow-xl">
+            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 flex items-center space-x-1 shadow-xl">
               <button
                 onClick={() => { setActiveLayer('ctx'); sfx.playBlip(); }}
                 className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
@@ -747,7 +748,9 @@ export default function MarsMap({
               <button
                 onClick={() => { setIsHiRISEInspectorOpen(true); sfx.playBlip(); }}
                 title="Inspect authentic 25cm/px micro-terrain from local 9.1GB GeoTIFF"
-                className="px-2 py-1 rounded text-xs font-mono transition-all flex items-center space-x-1 bg-purple-950/50 hover:bg-purple-900/70 text-purple-300 border border-purple-500/50 shadow-md ml-0.5"
+                className={`px-2 py-1 rounded text-xs font-mono transition-all flex items-center space-x-1 bg-purple-950/50 hover:bg-purple-900/70 text-purple-300 border border-purple-500/50 shadow-md ml-0.5 ${
+                  activeGuideStep === 5 ? 'ring-2 ring-purple-400 shadow-purple-500/50 scale-105' : ''
+                }`}
               >
                 <Scan className="w-3 h-3 text-purple-400 animate-pulse" />
                 <span className="font-semibold text-[11px]">25cm Lens</span>
@@ -755,7 +758,9 @@ export default function MarsMap({
               <button
                 onClick={() => { setIs3DModalOpen(true); sfx.playBlip(); }}
                 title="Launch Interactive 3D WebGL Terrain Orbit (Mesh derived from 20m DTM)"
-                className="px-2 py-1 rounded text-xs font-mono transition-all flex items-center space-x-1 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-500/50 shadow-md ml-0.5"
+                className={`px-2 py-1 rounded text-xs font-mono transition-all flex items-center space-x-1 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-500/50 shadow-md ml-0.5 ${
+                  activeGuideStep === 5 ? 'ring-2 ring-emerald-400 shadow-emerald-500/50 scale-105' : ''
+                }`}
               >
                 <Box className="w-3 h-3 text-emerald-400 animate-pulse" />
                 <span className="font-semibold text-[11px]">3D Orbit</span>
@@ -772,11 +777,11 @@ export default function MarsMap({
               </button>
               <button
                 onClick={() => { setActiveLayer('slope'); sfx.playBlip(); }}
-                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-colors flex items-center space-x-1.5 ${
+                className={`px-2.5 py-1.5 rounded text-xs font-mono transition-all flex items-center space-x-1.5 ${
                   activeLayer === 'slope'
                     ? 'bg-[#D97745] text-white font-medium shadow-md'
                     : 'text-[#A6A8AD] hover:text-[#F3F3F3] hover:bg-[#22252c]'
-                }`}
+                } ${activeGuideStep === 3 ? 'ring-2 ring-amber-400 shadow-amber-500/50 scale-105' : ''}`}
               >
                 <span>Slope Hazard</span>
               </button>
@@ -789,7 +794,7 @@ export default function MarsMap({
             </div>
 
             {/* Science Overlays Toggles */}
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-1 flex items-center space-x-1 shadow-xl">
+            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 flex items-center space-x-1 shadow-xl">
               <button
                 onClick={() => { setShowGeology(!showGeology); sfx.playBlip(); }}
                 className={`px-2.5 py-1.5 rounded text-[11px] font-mono border transition-colors flex items-center space-x-1.5 ${
@@ -823,7 +828,9 @@ export default function MarsMap({
           {/* Right Group: Mode Selector, Waypoints, Slope Limit, Reset & Route Action */}
           <div className="flex items-center gap-2 pointer-events-auto ml-auto">
             {/* Rover Mode vs Astronaut Mode Segmented Switch */}
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-0.5 flex items-center space-x-1 shadow-xl">
+            <div className={`bg-[#14161a]/80 backdrop-blur-md border rounded-lg p-0.5 flex items-center space-x-1 shadow-xl transition-all ${
+              activeGuideStep === 2 ? 'border-[#D97745] ring-2 ring-[#D97745]/80 shadow-orange-500/30' : 'border-[#33363D]/80'
+            }`}>
               <button
                 onClick={() => {
                   setExploreMode('rover');
@@ -863,7 +870,7 @@ export default function MarsMap({
             </div>
 
             {/* Slope Tolerance Selector */}
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg px-2.5 py-1.5 text-xs font-mono shadow-xl hidden md:flex items-center space-x-1.5">
+            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg px-2.5 py-1.5 text-xs font-mono shadow-xl hidden md:flex items-center space-x-1.5">
               <span className="text-[10px] text-[#A6A8AD] uppercase">Limit:</span>
               {[15, 20, 25].map(deg => (
                 <button
@@ -885,7 +892,7 @@ export default function MarsMap({
               ))}
             </div>
 
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg px-3 py-1.5 text-xs font-mono shadow-xl flex items-center space-x-2.5">
+            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg px-3 py-1.5 text-xs font-mono shadow-xl flex items-center space-x-2.5">
               <div className="flex items-center space-x-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
                 <span className="text-[#A6A8AD]">START:</span>
@@ -930,7 +937,9 @@ export default function MarsMap({
               <button
                 onClick={handleComputeRoute}
                 disabled={isCalculating}
-                className="bg-[#D97745] hover:bg-[#B85C38] text-white px-3.5 py-1.5 rounded-lg font-mono text-xs font-semibold shadow-xl flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap"
+                className={`bg-[#D97745] hover:bg-[#B85C38] text-white px-3.5 py-1.5 rounded-lg font-mono text-xs font-semibold shadow-xl flex items-center space-x-1.5 transition-all transform hover:scale-105 active:scale-95 whitespace-nowrap ${
+                  activeGuideStep === 2 ? 'ring-2 ring-orange-400 shadow-orange-500/50 scale-105 animate-pulse' : ''
+                }`}
               >
                 <Play className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : ''}`} />
                 <span>{isCalculating ? 'COMPUTING...' : 'COMPUTE ROUTE'}</span>
@@ -943,7 +952,9 @@ export default function MarsMap({
         <div className="flex flex-wrap items-center justify-between gap-2 pointer-events-none">
           <div className="flex flex-wrap items-center gap-2 pointer-events-auto">
             {/* 5 Real Perseverance Mission Presets Dropdown */}
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-1 flex items-center space-x-1.5 shadow-lg">
+            <div className={`bg-[#14161a]/80 backdrop-blur-md border rounded-lg p-1 flex items-center space-x-1.5 shadow-lg transition-all ${
+              activeGuideStep === 1 ? 'border-emerald-400 ring-2 ring-emerald-400/80 shadow-emerald-500/30' : 'border-[#33363D]/80'
+            }`}>
               <Compass className="w-3.5 h-3.5 text-[#D97745] ml-1" />
               <span className="text-[10px] font-mono uppercase text-[#A6A8AD] px-1">Presets:</span>
               <select
@@ -951,7 +962,7 @@ export default function MarsMap({
                   if (e.target.value) handleApplyPreset(e.target.value);
                 }}
                 defaultValue=""
-                className="bg-[#14161a] border border-[#33363D] text-[#F3F3F3] text-[11px] font-mono rounded px-2 py-1 outline-none hover:border-[#D97745] transition-colors cursor-pointer"
+                className="bg-[#101114]/90 border border-[#33363D] text-[#F3F3F3] text-[11px] font-mono rounded px-2 py-1 outline-none hover:border-[#D97745] transition-colors cursor-pointer"
               >
                 <option value="" disabled>Select Perseverance Milestone...</option>
                 <option value="perseverance_to_kodiak">1. Landing Site → Kodiak Butte Delta Remnant</option>
@@ -963,7 +974,7 @@ export default function MarsMap({
             </div>
 
             {/* Tactical Grid, Audio, Measure Tool & Mission Guide */}
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-1 flex items-center space-x-1 shadow-lg">
+            <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 flex items-center space-x-1 shadow-lg">
               <button
                 onClick={() => { setShowGraticule(!showGraticule); sfx.playBlip(); }}
                 title="Toggle Tactical Martian Grid (G)"
@@ -1014,7 +1025,7 @@ export default function MarsMap({
 
             {/* Opacity selector when viewing hazard or elevation overlay */}
             {(activeLayer === 'slope' || activeLayer === 'elevation') && (
-              <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg p-1 flex items-center space-x-1 shadow-lg text-[10px] font-mono">
+              <div className="bg-[#14161a]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg p-1 flex items-center space-x-1 shadow-lg text-[10px] font-mono">
                 <span className="text-[#A6A8AD] px-1">Blend:</span>
                 {[0.4, 0.7, 1.0].map((op) => (
                   <button
@@ -1033,7 +1044,9 @@ export default function MarsMap({
 
           {/* EVA / Rover Traverse Simulator & Comparison Controls */}
           {routeData && (
-            <div className="bg-[#191b20]/95 backdrop-blur-md border border-sky-500/40 rounded-lg p-1 px-2 flex items-center space-x-2 shadow-2xl pointer-events-auto">
+            <div className={`bg-[#14161a]/80 backdrop-blur-md border rounded-lg p-1 px-2 flex items-center space-x-2 shadow-2xl pointer-events-auto transition-all ${
+              activeGuideStep === 6 ? 'border-sky-400 ring-2 ring-sky-400/80 shadow-sky-500/30' : 'border-sky-500/40'
+            }`}>
               <div className="flex items-center space-x-1.5 pr-1 border-r border-[#33363D]">
                 <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
                 <span className="text-[10px] font-mono font-bold text-sky-400">
@@ -1697,8 +1710,8 @@ export default function MarsMap({
 
       {/* Mars GPS Position System — floating HUD for astronaut orientation */}
       {gpsPosition && (
-        <div className="absolute bottom-56 left-3 z-[1000] pointer-events-none">
-          <div className="bg-[#191b20]/95 backdrop-blur-md border border-emerald-500/30 rounded-lg p-2 shadow-xl pointer-events-auto min-w-[175px]">
+        <div className={`absolute ${routeData ? 'bottom-[180px]' : 'bottom-12'} left-3 z-[1000] pointer-events-none transition-all duration-300`}>
+          <div className="bg-[#121418]/80 backdrop-blur-md border border-emerald-500/40 rounded-lg p-2 shadow-xl pointer-events-auto min-w-[175px]">
             <div className="flex items-center space-x-1.5 mb-1 pb-1 border-b border-[#33363D]">
               <span className={`w-1.5 h-1.5 rounded-full ${gpsPosition.isLive ? 'bg-emerald-400 animate-pulse' : 'bg-sky-400'}`}></span>
               <span className="text-[8px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Mars Position System</span>
@@ -1750,7 +1763,11 @@ export default function MarsMap({
       {/* Interactive In-UI Guided Tour Dock for Hackathon Judges */}
       <InUIGuideTour
         isActive={showGuideModal}
-        onClose={() => setShowGuideModal(false)}
+        onClose={() => {
+          setShowGuideModal(false);
+          setActiveGuideStep(null);
+        }}
+        onStepChange={(step) => setActiveGuideStep(step)}
         onApplyPreset={handleApplyPreset}
         onComputeRoute={handleComputeRoute}
         onSetActiveLayer={(layer) => setActiveLayer(layer)}

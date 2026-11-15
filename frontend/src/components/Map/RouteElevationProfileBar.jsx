@@ -79,7 +79,7 @@ export default function RouteElevationProfileBar({
 
   return (
     <div className="absolute bottom-11 left-3 right-3 sm:left-4 sm:right-auto z-[1000] pointer-events-auto">
-      <div className="bg-[#191b20]/95 backdrop-blur-md border border-[#33363D] rounded-lg shadow-2xl overflow-hidden font-mono text-xs w-full sm:w-[540px] md:w-[620px]">
+      <div className="bg-[#121418]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg shadow-2xl overflow-hidden font-mono text-xs w-full sm:w-[500px] md:w-[560px]">
         {/* Toggle Header Bar */}
         <div 
           onClick={() => setIsExpanded(!isExpanded)}
