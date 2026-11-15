@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Modal entrance animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
 :root {
   --background: #101114;
   --surface: #191b20;
@@ -46,6 +55,11 @@ body {
   font-family: inherit;
 }
 
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
 .leaflet-bar a {
   background-color: #191b20 !important;
   color: #F3F3F3 !important;
@@ -55,5 +69,56 @@ body {
 .leaflet-bar a:hover {
   background-color: #22252c !important;
   color: #D97745 !important;
+}
+
+/* Geology polygon floating labels */
+.geology-label-tooltip {
+  background: rgba(16, 17, 20, 0.85) !important;
+  border: 1px solid rgba(51, 54, 61, 0.8) !important;
+  border-radius: 4px !important;
+  padding: 1px 6px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.8) !important;
+  font-family: monospace !important;
+}
+
+.geology-label-tooltip::before {
+  display: none !important;
+}
+
+/* Printable Clean Dossier Summary */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  header, aside, footer, .leaflet-control-container, nav {
+    display: none !important;
+  }
+
+  .fixed {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  .bg-\[\#191b20\], .bg-\[\#14161a\], .bg-\[\#101114\] {
+    background: #ffffff !important;
+    color: #111827 !important;
+    border-color: #e5e7eb !important;
+    box-shadow: none !important;
+  }
+
+  .text-white, .text-\[\#F3F3F3\] {
+    color: #111827 !important;
+  }
+
+  .text-\[\#A6A8AD\] {
+    color: #4b5563 !important;
+  }
+
+  button {
+    display: none !important;
+  }
 }
 
