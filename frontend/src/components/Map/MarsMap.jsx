@@ -19,6 +19,7 @@ import {
 import { 
   Eye, 
   Scan, 
+  Box,
   Mountain, 
   TrendingUp, 
   Play, 
@@ -33,14 +34,14 @@ import {
   Compass, 
   CheckCircle2, 
   Sparkles, 
-  Download,
-  Share2,
-  Ruler,
-  Truck,
-  User,
-  AlertTriangle,
-  HelpCircle,
-  Keyboard,
+  Download, 
+  Share2, 
+  Ruler, 
+  Truck, 
+  User, 
+  AlertTriangle, 
+  HelpCircle, 
+  Keyboard, 
   Navigation as NavIcon 
 } from 'lucide-react';
 import L from 'leaflet';
@@ -52,6 +53,7 @@ import RouteElevationProfileBar from './RouteElevationProfileBar';
 import MapLegendBar from './MapLegendBar';
 import GeologyLegendBar from './GeologyLegendBar';
 import HiRISEInspectorModal from './HiRISEInspectorModal';
+import Terrain3DModal from './Terrain3DModal';
 
 const JEZERO_BOUNDS = [
   [18.2110274, 77.1604655],
@@ -253,6 +255,7 @@ export default function MarsMap({
   const [isMuted, setIsMuted] = useState(false);
   const [isDossierOpen, setIsDossierOpen] = useState(false);
   const [isHiRISEInspectorOpen, setIsHiRISEInspectorOpen] = useState(false);
+  const [is3DModalOpen, setIs3DModalOpen] = useState(false);
   const [scrubberPoint, setScrubberPoint] = useState(null);
   const [currentZoom, setCurrentZoom] = useState(11);
 
@@ -416,6 +419,9 @@ export default function MarsMap({
           setIsDossierOpen(true);
           sfx.playBlip();
         }
+      } else if (e.key === 'v' || e.key === 'V' || e.key === 'o' || e.key === 'O') {
+        setIs3DModalOpen(prev => !prev);
+        sfx.playBlip();
       } else if (e.key === '1') {
         setActiveLayer('ctx');
         sfx.playBlip();
@@ -705,6 +711,14 @@ export default function MarsMap({
               >
                 <Scan className="w-3 h-3 text-purple-400 animate-pulse" />
                 <span className="font-semibold text-[11px]">25cm Lens</span>
+              </button>
+              <button
+                onClick={() => { setIs3DModalOpen(true); sfx.playBlip(); }}
+                title="Launch Interactive 3D WebGL Terrain Orbit (Mesh derived from 20m DTM)"
+                className="px-2 py-1 rounded text-xs font-mono transition-all flex items-center space-x-1 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-500/50 shadow-md ml-0.5"
+              >
+                <Box className="w-3 h-3 text-emerald-400 animate-pulse" />
+                <span className="font-semibold text-[11px]">3D Orbit</span>
               </button>
               <button
                 onClick={() => { setActiveLayer('elevation'); sfx.playBlip(); }}
@@ -1747,6 +1761,7 @@ export default function MarsMap({
                   <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">R</kbd> Reset Waypoints</div>
                   <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">D</kbd> Mission Dossier</div>
                   <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">G</kbd> Tactical Grid</div>
+                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">V</kbd> 3D Terrain Orbit</div>
                   <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">F</kbd> Fullscreen Ops</div>
                   <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">?</kbd> Open Guide</div>
                 </div>
@@ -1779,6 +1794,15 @@ export default function MarsMap({
         currentCoords={cursorCoords || destinationPoint || startPoint || hoveredCoords}
         onSelectWaypoint={onSelectPoint}
         routeData={routeData}
+      />
+
+      {/* Interactive 3D WebGL Jezero Crater Orbit Terrain Modal */}
+      <Terrain3DModal
+        isOpen={is3DModalOpen}
+        onClose={() => setIs3DModalOpen(false)}
+        routeData={routeData}
+        startPoint={startPoint}
+        destinationPoint={destinationPoint}
       />
     </div>
   );

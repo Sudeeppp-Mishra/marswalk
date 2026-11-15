@@ -63,7 +63,14 @@ Astro-nah is a full-stack planetary surface exploration and navigation platform 
 - **Steep-Segment Warning Badges**: Real-time callout badges positioned on the route at the peak incline (e.g. `▲ PEAK: 7.5° @ km 0.92`), alerting mission planners to maximum slopes.
 - **Tactical Measure Ruler & Quick Mission Guide**: Two-point surface distance and $\Delta z$ elevation difference ruler, plus a 3-step interactive onboarding guide for hackathon judges.
 
-### 7. Mission Dispatch Dossier & Print-Ready Brief
+### 7. Interactive 3D WebGL Jezero Crater Terrain Orbit (`3D Orbit` / key `V`)
+- **True 20m DTM Mesh**: Reconstructs an interactive 3D terrain mesh displaced by true elevation values from the USGS CTX DTM GeoTIFF.
+- **Surface Texture Draper**: Dynamically drapes CTX Visible Optical Mosaic (6m/px), Hypsometric Elevation Colormap, or Slope Hazard tiers over the 3D topology.
+- **3D Route Visualization**: Renders the active cost-weighted A* traverse as a glowing 3D tubular spline with start/destination pins conforming to the Martian terrain.
+- **Vertical Exaggeration Slider (0.8x – 4.0x)**: Real-time topographic relief exaggeration to make delta scarps, craters, and Kodiak Butte clearly perceptible.
+- **Cinematic Orbit & Martian Sun Lighting**: OrbitControls camera with pitch, yaw, pan, zoom, atmospheric fog, and Martian solar illumination.
+
+### 8. Mission Dispatch Dossier & Print-Ready Brief
 - Generates an official aerospace mission dossier modal with complete coordinate lists, elevation deltas, slope gradients, and scientific disclosures.
 - Includes `@media print` stylesheets for clean single-page PDF generation.
 
