@@ -304,6 +304,7 @@ export default function MarsMap({
   const routeDataRef = useRef(routeData);
   const maxSlopeRef = useRef(maxSlope);
   const isCalculatingRef = useRef(isCalculating);
+  const computeRouteWithSlopeRef = useRef();
 
   useEffect(() => { startPointRef.current = startPoint; }, [startPoint]);
   useEffect(() => { destinationPointRef.current = destinationPoint; }, [destinationPoint]);
@@ -441,11 +442,22 @@ export default function MarsMap({
         handleResetPoints();
       } else if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
         e.preventDefault();
-        if (routeDataRef.current) {
-          // Play / Pause live traverse simulation
+        const curRoute = routeDataRef.current || routeData;
+        const curStart = startPointRef.current || startPoint;
+        const curDest = destinationPointRef.current || destinationPoint;
+
+        if (curStart && curDest && !curRoute) {
+          // Both waypoints are selected, calculate optimal path now
+          sfx.playBlip();
+          if (computeRouteWithSlopeRef.current) {
+            computeRouteWithSlopeRef.current(maxSlopeRef.current);
+          } else {
+            handleComputeRouteWithSlope(maxSlopeRef.current);
+          }
+        } else if (curRoute) {
+          // Traverse path already loaded: toggle live astronaut simulation
           setSimState(prev => {
-            const rData = routeDataRef.current;
-            const isAtEnd = prev.stepIndex >= (rData?.route?.length || 1) - 1;
+            const isAtEnd = prev.stepIndex >= (curRoute?.route?.length || 1) - 1;
             return {
               ...prev,
               isPlaying: isAtEnd ? true : !prev.isPlaying,
@@ -453,16 +465,18 @@ export default function MarsMap({
             };
           });
           sfx.playBlip();
-        } else if (startPointRef.current && destinationPointRef.current && !isCalculatingRef.current) {
-          // Solve route instantly when waypoints are set
-          sfx.playBlip();
-          handleComputeRouteWithSlope(maxSlopeRef.current);
+        } else if (!curStart) {
+          setFeedbackMsg({ type: 'info', text: 'Click anywhere on the map to set Origin waypoint.' });
+          setTimeout(() => setFeedbackMsg(null), 2500);
+        } else if (!curDest) {
+          setFeedbackMsg({ type: 'info', text: 'Click anywhere on the map to set Destination waypoint.' });
+          setTimeout(() => setFeedbackMsg(null), 2500);
         }
       } else if (e.key === 'g' || e.key === 'G') {
         setShowGraticule(prev => !prev);
         sfx.playBlip();
       } else if (e.key === 'd' || e.key === 'D') {
-        if (routeDataRef.current) {
+        if (routeDataRef.current || routeData) {
           setIsDossierOpen(true);
           sfx.playBlip();
         }
@@ -486,7 +500,7 @@ export default function MarsMap({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [startPoint, destinationPoint, routeData, maxSlope]);
 
   const handleToggleMute = () => {
     const nextMuted = !isMuted;
@@ -553,50 +567,88 @@ export default function MarsMap({
     sfx.playBlip();
 
     if (!startPoint) {
-      onSelectPoint('start', { lat, lng });
+      const s = { lat, lng };
+      startPointRef.current = s;
+      onSelectPoint('start', s);
+      setRouteData(null);
+      routeDataRef.current = null;
       setFeedbackMsg({ type: 'info', text: 'Origin set. Click destination on the map.' });
       setTimeout(() => setFeedbackMsg(null), 3000);
     } else if (!destinationPoint) {
-      onSelectPoint('destination', { lat, lng });
-      setFeedbackMsg({ type: 'success', text: 'Waypoints set. Click "Compute Route" or press Space.' });
+      const d = { lat, lng };
+      destinationPointRef.current = d;
+      onSelectPoint('destination', d);
+      setRouteData(null);
+      routeDataRef.current = null;
+      setFeedbackMsg({ type: 'success', text: 'Waypoints set. Press Space or click "Compute Route".' });
       setTimeout(() => setFeedbackMsg(null), 3500);
     } else {
-      onSelectPoint('start', { lat, lng });
+      const s = { lat, lng };
+      startPointRef.current = s;
+      destinationPointRef.current = null;
+      onSelectPoint('start', s);
       onSelectPoint('destination', null);
       setRouteData(null);
+      routeDataRef.current = null;
+      setFeedbackMsg({ type: 'info', text: 'New Origin set. Click destination on the map.' });
+      setTimeout(() => setFeedbackMsg(null), 3000);
     }
   };
 
   const handleComputeRouteWithSlope = async (targetSlope) => {
-    if (!startPoint || !destinationPoint) return;
+    const s = startPointRef.current || startPoint;
+    const d = destinationPointRef.current || destinationPoint;
+    if (!s || !d) {
+      console.warn('Astro-nah: Missing start or destination point', { s, d });
+      setFeedbackMsg({ type: 'warning', text: 'Select both Origin and Destination on the map first.' });
+      setTimeout(() => setFeedbackMsg(null), 3000);
+      return;
+    }
+
     setIsCalculating(true);
-    setFeedbackMsg(null);
+    isCalculatingRef.current = true;
+    setFeedbackMsg({ type: 'info', text: 'Calculating optimal traverse path...' });
     sfx.playBlip();
 
-    const slopeVal = targetSlope !== undefined ? targetSlope : maxSlope;
-    const res = await calculateRoute(startPoint, destinationPoint, slopeVal);
-    setIsCalculating(false);
+    const slopeVal = targetSlope !== undefined ? targetSlope : (maxSlopeRef.current ?? maxSlope);
+    try {
+      const res = await calculateRoute(s, d, slopeVal);
+      setIsCalculating(false);
+      isCalculatingRef.current = false;
 
-    if (res && res.status === 'success') {
-      setRouteData(res);
-      sfx.playSuccess();
-      if (res.hazard_warning) {
-        setFeedbackMsg({ type: 'warning', text: res.hazard_warning });
-        setTimeout(() => setFeedbackMsg(null), 7000);
+      if (res && res.status === 'success') {
+        setRouteData(res);
+        routeDataRef.current = res;
+        sfx.playSuccess();
+        if (res.hazard_warning) {
+          setFeedbackMsg({ type: 'warning', text: res.hazard_warning });
+          setTimeout(() => setFeedbackMsg(null), 7000);
+        } else {
+          setFeedbackMsg({ type: 'success', text: `Route computed: ${res.distance_km} km (${res.estimated_difficulty || 'Optimal'})` });
+          setTimeout(() => setFeedbackMsg(null), 4000);
+        }
       } else {
-        setFeedbackMsg({ type: 'success', text: `Route computed: ${res.distance_km} km (${res.estimated_difficulty})` });
-        setTimeout(() => setFeedbackMsg(null), 4000);
+        sfx.playWarning();
+        setFeedbackMsg({ type: 'error', text: res?.error || 'Path blocked by steep terrain hazards.' });
       }
-    } else {
+    } catch (err) {
+      console.error('Route calculation error:', err);
+      setIsCalculating(false);
+      isCalculatingRef.current = false;
       sfx.playWarning();
-      setFeedbackMsg({ type: 'error', text: res?.error || 'Path blocked by steep terrain hazards.' });
+      setFeedbackMsg({ type: 'error', text: 'Path calculation encountered an error.' });
     }
   };
+
+  computeRouteWithSlopeRef.current = handleComputeRouteWithSlope;
 
   const handleComputeRoute = () => handleComputeRouteWithSlope(maxSlope);
 
   const handleResetPoints = () => {
     sfx.playBlip();
+    startPointRef.current = null;
+    destinationPointRef.current = null;
+    routeDataRef.current = null;
     onSelectPoint('start', null);
     onSelectPoint('destination', null);
     setRouteData(null);
