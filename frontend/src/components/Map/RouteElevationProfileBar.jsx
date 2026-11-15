@@ -5,12 +5,15 @@ export default function RouteElevationProfileBar({
   routeData, 
   onHoverPoint, 
   onLeavePoint,
-  onJumpToStep 
+  onJumpToStep,
+  forceCollapse = false
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [hoverInfo, setHoverInfo] = useState(null);
 
   if (!routeData || !routeData.route || routeData.route.length === 0) return null;
+
+  const effectiveExpanded = forceCollapse ? false : isExpanded;
 
   const route = routeData.route;
   const elevs = route.map(r => r.elevation_m);
@@ -82,7 +85,7 @@ export default function RouteElevationProfileBar({
       <div className="bg-[#121418]/80 backdrop-blur-md border border-[#33363D]/80 rounded-lg shadow-2xl overflow-hidden font-mono text-xs w-full sm:w-[500px] md:w-[560px]">
         {/* Toggle Header Bar */}
         <div 
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => setIsExpanded(!effectiveExpanded)}
           className="p-2 px-3 flex items-center justify-between cursor-pointer hover:bg-[#22252c] border-b border-[#33363D]/60 transition-colors select-none"
         >
           <div className="flex items-center space-x-2">
@@ -93,13 +96,13 @@ export default function RouteElevationProfileBar({
             </span>
           </div>
           <div className="flex items-center space-x-2 text-[10px] text-[#A6A8AD]">
-            <span>{isExpanded ? 'Minimize' : 'Inspect Cross-Section'}</span>
-            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            <span>{effectiveExpanded ? 'Minimize' : 'Inspect Cross-Section'}</span>
+            {effectiveExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
           </div>
         </div>
 
         {/* Collapsible Graph Area */}
-        {isExpanded && (
+        {effectiveExpanded && (
           <div className="p-2 space-y-1">
             <div className="relative">
               <svg 

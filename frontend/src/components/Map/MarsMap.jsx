@@ -298,6 +298,19 @@ export default function MarsMap({
   const [isCalculating, setIsCalculating] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState(null);
 
+  // Synchronized refs for reliable global keyboard interactions (Space, Reset, etc.)
+  const startPointRef = useRef(startPoint);
+  const destinationPointRef = useRef(destinationPoint);
+  const routeDataRef = useRef(routeData);
+  const maxSlopeRef = useRef(maxSlope);
+  const isCalculatingRef = useRef(isCalculating);
+
+  useEffect(() => { startPointRef.current = startPoint; }, [startPoint]);
+  useEffect(() => { destinationPointRef.current = destinationPoint; }, [destinationPoint]);
+  useEffect(() => { routeDataRef.current = routeData; }, [routeData]);
+  useEffect(() => { maxSlopeRef.current = maxSlope; }, [maxSlope]);
+  useEffect(() => { isCalculatingRef.current = isCalculating; }, [isCalculating]);
+
   // Point in polygon helper for geology unit intersection
   const isPointInPolygon = (lat, lng, polygon) => {
     let inside = false;
@@ -426,21 +439,30 @@ export default function MarsMap({
 
       if (e.key === 'r' || e.key === 'R' || e.key === 'Escape') {
         handleResetPoints();
-      } else if (e.code === 'Space') {
+      } else if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
         e.preventDefault();
-        if (routeData) {
-          setSimState(prev => ({
-            ...prev,
-            isPlaying: prev.stepIndex >= (routeData.route?.length || 1) - 1 ? true : !prev.isPlaying,
-            stepIndex: prev.stepIndex >= (routeData.route?.length || 1) - 1 ? 0 : prev.stepIndex
-          }));
+        if (routeDataRef.current) {
+          // Play / Pause live traverse simulation
+          setSimState(prev => {
+            const rData = routeDataRef.current;
+            const isAtEnd = prev.stepIndex >= (rData?.route?.length || 1) - 1;
+            return {
+              ...prev,
+              isPlaying: isAtEnd ? true : !prev.isPlaying,
+              stepIndex: isAtEnd ? 0 : prev.stepIndex
+            };
+          });
           sfx.playBlip();
+        } else if (startPointRef.current && destinationPointRef.current && !isCalculatingRef.current) {
+          // Solve route instantly when waypoints are set
+          sfx.playBlip();
+          handleComputeRouteWithSlope(maxSlopeRef.current);
         }
       } else if (e.key === 'g' || e.key === 'G') {
         setShowGraticule(prev => !prev);
         sfx.playBlip();
       } else if (e.key === 'd' || e.key === 'D') {
-        if (routeData) {
+        if (routeDataRef.current) {
           setIsDossierOpen(true);
           sfx.playBlip();
         }
@@ -464,7 +486,7 @@ export default function MarsMap({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [routeData]);
+  }, []);
 
   const handleToggleMute = () => {
     const nextMuted = !isMuted;
@@ -1033,18 +1055,16 @@ export default function MarsMap({
         </div>
       </div>
 
-      {/* Floating Feedback Notification */}
+      {/* Floating Feedback Notification — docked at bottom-center to never overlap top controls */}
       {feedbackMsg && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[1050] pointer-events-auto text-xs font-mono px-3 py-1.5 rounded-lg max-w-sm shadow-xl backdrop-blur-md border animate-in slide-in-from-top-2 duration-200">
-          <div className={
-            feedbackMsg.type === 'error'
-              ? 'bg-rose-950/90 border-rose-500/50 text-rose-200'
-              : feedbackMsg.type === 'warning'
-              ? 'bg-amber-950/90 border-amber-500/50 text-amber-200'
-              : 'bg-[#14161a]/95 border-emerald-500/50 text-emerald-300'
-          }>
-            {feedbackMsg.text}
-          </div>
+        <div className={`absolute bottom-12 left-1/2 -translate-x-1/2 z-[1300] pointer-events-auto text-xs font-mono px-3.5 py-1.5 rounded-lg shadow-2xl backdrop-blur-md border animate-in slide-in-from-bottom-2 duration-200 select-none ${
+          feedbackMsg.type === 'error'
+            ? 'bg-rose-950/95 border-rose-500/60 text-rose-200'
+            : feedbackMsg.type === 'warning'
+            ? 'bg-amber-950/95 border-amber-500/60 text-amber-200'
+            : 'bg-[#14161a]/95 border-emerald-500/60 text-emerald-300'
+        }`}>
+          {feedbackMsg.text}
         </div>
       )}
 
@@ -1598,6 +1618,7 @@ export default function MarsMap({
       {/* Interactive Bottom Elevation Profile Drawer (Active when route computed) */}
       <RouteElevationProfileBar
         routeData={routeData}
+        forceCollapse={showGuideModal}
         onHoverPoint={(pt) => setScrubberPoint(pt)}
         onLeavePoint={() => setScrubberPoint(null)}
         onJumpToStep={(stepIdx) => {
@@ -1611,7 +1632,7 @@ export default function MarsMap({
 
       {/* Mars GPS Position System — floating HUD for astronaut orientation */}
       {gpsPosition && (
-        <div className={`absolute ${routeData ? 'bottom-[180px]' : 'bottom-12'} left-3 z-[1000] pointer-events-none transition-all duration-300`}>
+        <div className={`absolute ${routeData && !showGuideModal ? 'bottom-[180px]' : 'bottom-12'} left-3 z-[1000] pointer-events-none transition-all duration-300`}>
           <div className="bg-[#121418]/80 backdrop-blur-md border border-emerald-500/40 rounded-lg p-2 shadow-xl pointer-events-auto min-w-[175px]">
             <div className="flex items-center space-x-1.5 mb-1 pb-1 border-b border-[#33363D]">
               <span className={`w-1.5 h-1.5 rounded-full ${gpsPosition.isLive ? 'bg-emerald-400 animate-pulse' : 'bg-sky-400'}`}></span>

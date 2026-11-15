@@ -92,27 +92,27 @@ const TOUR_STEPS = [
 
 const TOUR_POSITIONS = {
   presets: {
-    container: 'top-16 left-3 sm:left-[28%]',
+    container: 'top-14 left-3 sm:left-[22%] md:left-[25%]',
     arrow: 'top-[-8px] left-12 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   mode_compute: {
-    container: 'top-16 left-3 sm:left-[36%]',
+    container: 'top-14 left-3 sm:left-[30%] md:left-[34%]',
     arrow: 'top-[-8px] left-16 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   layers: {
-    container: 'top-16 left-3 sm:left-4',
+    container: 'top-14 left-3 sm:left-4',
     arrow: 'top-[-8px] left-16 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   comparison_geology: {
-    container: 'top-16 right-3 sm:right-6',
+    container: 'top-14 right-3 sm:right-6',
     arrow: 'top-[-8px] right-8 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   micro_3d: {
-    container: 'top-16 left-3 sm:left-24',
+    container: 'top-14 left-3 sm:left-24',
     arrow: 'top-[-8px] left-16 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   },
   simulation_export: {
-    container: 'top-16 left-3 sm:left-[42%]',
+    container: 'top-14 left-3 sm:left-[36%] md:left-[38%]',
     arrow: 'top-[-8px] left-16 border-b-[8px] border-l-[7px] border-r-[7px] border-l-transparent border-r-transparent'
   }
 };
@@ -189,10 +189,10 @@ export default function InUIGuideTour({
   };
 
   return (
-    <div className={`absolute ${positionConfig.container} z-[1500] w-[94vw] sm:w-[440px] md:w-[460px] pointer-events-auto transition-all duration-300 font-mono select-none`}>
+    <div className={`absolute ${positionConfig.container} z-[1500] w-[92vw] sm:w-[390px] md:w-[410px] pointer-events-auto transition-all duration-300 font-mono select-none`}>
       {/* Semi-transparent Frosted Aerospace Card */}
       <div 
-        className="relative bg-[#121418]/75 backdrop-blur-md border rounded-xl shadow-2xl p-3.5 overflow-hidden transition-all duration-300" 
+        className="relative bg-[#121418]/80 backdrop-blur-md border rounded-xl shadow-2xl p-3 overflow-hidden transition-all duration-300" 
         style={{ borderColor: `${currentStep.color}90`, boxShadow: `0 10px 30px -5px ${currentStep.color}25` }}
       >
         {/* Anchor Arrow pointing to targeted button */}
