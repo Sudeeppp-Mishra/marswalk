@@ -42,7 +42,8 @@ import {
   AlertTriangle, 
   HelpCircle, 
   Keyboard, 
-  Navigation as NavIcon 
+  Navigation as NavIcon,
+  Waves 
 } from 'lucide-react';
 import L from 'leaflet';
 import { getOverlayUrl, getTerrainAtPoint, calculateRoute, getGeologyData, DEFAULT_GEOLOGY_DATA } from '../../services/api';
@@ -55,6 +56,8 @@ import GeologyLegendBar from './GeologyLegendBar';
 import HiRISEInspectorModal from './HiRISEInspectorModal';
 import Terrain3DModal from './Terrain3DModal';
 import InUIGuideTour from '../Common/InUIGuideTour';
+import PaleolakeDrawer from './PaleolakeDrawer';
+import { generatePaleolakeCanvasUrl } from '../../utils/paleolake';
 
 const JEZERO_BOUNDS = [
   [18.2110274, 77.1604655],
@@ -311,6 +314,38 @@ export default function MarsMap({
   useEffect(() => { routeDataRef.current = routeData; }, [routeData]);
   useEffect(() => { maxSlopeRef.current = maxSlope; }, [maxSlope]);
   useEffect(() => { isCalculatingRef.current = isCalculating; }, [isCalculating]);
+
+  // Ancient Jezero Crater Paleolake (~3.7 Ga) State
+  const [isLakeActive, setIsLakeActive] = useState(false);
+  const [waterLevel, setWaterLevel] = useState(-2395); // Gilbert delta canonical shoreline
+  const [avoidWater, setAvoidWater] = useState(false);
+  const [paleolakeOverlayUrl, setPaleolakeOverlayUrl] = useState(null);
+  const heightmapImgRef = useRef(null);
+
+  // Pre-load authentic heightmap image for instant client-side paleolake canvas rendering
+  useEffect(() => {
+    const img = new Image();
+    img.src = '/overlays/jezero_heightmap.png';
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      heightmapImgRef.current = img;
+      if (isLakeActive && waterLevel > -2600) {
+        const url = generatePaleolakeCanvasUrl(img, waterLevel);
+        setPaleolakeOverlayUrl(url);
+      }
+    };
+  }, []);
+
+  // Update paleolake flood overlay dynamically when water level or toggle changes
+  useEffect(() => {
+    if (!heightmapImgRef.current) return;
+    if (isLakeActive && waterLevel > -2600) {
+      const url = generatePaleolakeCanvasUrl(heightmapImgRef.current, waterLevel);
+      setPaleolakeOverlayUrl(url);
+    } else {
+      setPaleolakeOverlayUrl(null);
+    }
+  }, [isLakeActive, waterLevel]);
 
   // Point in polygon helper for geology unit intersection
   const isPointInPolygon = (lat, lng, polygon) => {
@@ -595,7 +630,7 @@ export default function MarsMap({
     }
   };
 
-  const handleComputeRouteWithSlope = async (targetSlope) => {
+  const handleComputeRouteWithSlope = async (targetSlope, targetAvoidWater = avoidWater) => {
     const s = startPointRef.current || startPoint;
     const d = destinationPointRef.current || destinationPoint;
     if (!s || !d) {
@@ -607,12 +642,18 @@ export default function MarsMap({
 
     setIsCalculating(true);
     isCalculatingRef.current = true;
-    setFeedbackMsg({ type: 'info', text: 'Calculating optimal traverse path...' });
+    setFeedbackMsg({ type: 'info', text: targetAvoidWater ? 'Calculating dry shoreline traverse around Lake Jezero...' : 'Calculating optimal traverse path...' });
     sfx.playBlip();
 
     const slopeVal = targetSlope !== undefined ? targetSlope : (maxSlopeRef.current ?? maxSlope);
     try {
-      const res = await calculateRoute(s, d, slopeVal);
+      const res = await calculateRoute(
+        s, 
+        d, 
+        slopeVal, 
+        isLakeActive ? waterLevel : null, 
+        targetAvoidWater
+      );
       setIsCalculating(false);
       isCalculatingRef.current = false;
 
@@ -892,6 +933,22 @@ export default function MarsMap({
             <span>Sols</span>
             <span className={`text-[8px] px-1 rounded ${showObservations ? 'bg-sky-400 text-black font-bold' : 'bg-[#101114]'}`}>
               {showObservations ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          <button
+            onClick={() => { setIsLakeActive(!isLakeActive); sfx.playBlip(); }}
+            title="Simulate Ancient Jezero Crater Paleolake (~3.7 Ga)"
+            className={`px-2 py-1 rounded text-[10px] border transition-all flex items-center space-x-1 ${
+              isLakeActive 
+                ? 'bg-sky-500/25 text-sky-200 border-sky-400 font-bold shadow-md shadow-sky-500/20' 
+                : 'bg-transparent text-[#A6A8AD] border-transparent hover:bg-[#22252c] hover:text-white'
+            }`}
+          >
+            <Waves className="w-3.5 h-3.5 text-sky-400" />
+            <span>Lake</span>
+            <span className={`text-[8px] px-1 rounded ${isLakeActive ? 'bg-sky-400 text-black font-bold' : 'bg-[#101114]'}`}>
+              {isLakeActive ? `${waterLevel <= -2600 ? 'DRY' : `${waterLevel}m`}` : 'OFF'}
             </span>
           </button>
 
@@ -1210,6 +1267,16 @@ export default function MarsMap({
             url={getOverlayUrl('slope')}
             bounds={JEZERO_BOUNDS}
             opacity={overlayOpacity}
+          />
+        )}
+
+        {/* Ancient Jezero Crater Paleolake Dynamic Flood Overlay (~3.7 Ga) */}
+        {isLakeActive && paleolakeOverlayUrl && (
+          <ImageOverlay
+            url={paleolakeOverlayUrl}
+            bounds={JEZERO_BOUNDS}
+            opacity={0.82}
+            zIndex={400}
           />
         )}
 
@@ -1769,6 +1836,23 @@ export default function MarsMap({
         routeData={routeData}
       />
 
+      {/* Ancient Jezero Crater Paleolake Flood Controls & Paleohydrology Drawer */}
+      <PaleolakeDrawer
+        isOpen={isLakeActive}
+        onClose={() => setIsLakeActive(false)}
+        waterLevel={waterLevel}
+        onWaterLevelChange={(lvl) => setWaterLevel(lvl)}
+        routeData={routeData}
+        avoidWater={avoidWater}
+        onToggleAvoidWater={() => {
+          const next = !avoidWater;
+          setAvoidWater(next);
+          if (startPoint && destinationPoint) {
+            handleComputeRouteWithSlope(maxSlope, next);
+          }
+        }}
+      />
+
       {/* Interactive 3D WebGL Jezero Crater Orbit Terrain Modal */}
       <Terrain3DModal
         isOpen={is3DModalOpen}
@@ -1778,6 +1862,9 @@ export default function MarsMap({
         destinationPoint={destinationPoint}
         onSelectWaypoint={onSelectPoint}
         onRouteComputed={(newRoute) => setRouteData(newRoute)}
+        waterLevel={waterLevel}
+        isLakeActive={isLakeActive}
+        onWaterLevelChange={(lvl) => setWaterLevel(lvl)}
       />
     </div>
   );

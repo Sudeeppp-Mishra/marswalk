@@ -150,7 +150,9 @@ async def calculate_route(request: RouteRequest):
         start_lng=request.start.lng,
         dest_lat=request.destination.lat,
         dest_lng=request.destination.lng,
-        max_slope_deg=max_slope
+        max_slope_deg=max_slope,
+        water_level=request.water_level,
+        avoid_water=request.avoid_water or False
     )
 
     return RouteResponse(

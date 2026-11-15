@@ -196,7 +196,9 @@ class TerrainProcessor:
         start_lng: float,
         dest_lat: float,
         dest_lng: float,
-        max_slope_deg: float = 20.0
+        max_slope_deg: float = 20.0,
+        water_level: float | None = None,
+        avoid_water: bool = False
     ) -> dict:
         """
         Calculates suggested path between start and destination coordinates.
@@ -228,7 +230,9 @@ class TerrainProcessor:
             elevation_grid=self._elevation,
             slope_grid=self._slope,
             res_meters=self._res[0],
-            max_slope_deg=max_slope_deg
+            max_slope_deg=max_slope_deg,
+            water_level=water_level,
+            avoid_water=avoid_water
         )
 
         result = planner.find_path(start_rc, dest_rc)

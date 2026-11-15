@@ -47,13 +47,13 @@ const TOUR_STEPS = [
   {
     step: 3,
     target: 'layers',
-    category: 'Scientific Cartography',
-    title: '3. Inspect 3-Tier Slope Hazard & Elevation DEM',
-    description: 'Toggle Slope Hazard to reveal our 3-tier safety classification derived from the 20m CTX DTM: <10° Safe (Green), 10°–20° Caution (Amber), and >20° Impassable Hazard (Crimson). Adjust the Blend slider to overlay directly on satellite CTX imagery.',
+    category: 'Scientific Cartography & Paleolake',
+    title: '3. 3-Tier Slope Hazard & Ancient Lake Simulation',
+    description: 'Toggle Slope Hazard for our 20m CTX 3-tier safety classification (<10° Safe, 10°–20° Caution, >20° Hazard). Click "Lake" to simulate ancient Lake Jezero (~3.7 Ga): drag the water level slider to flood the DEM and see why NASA chose this landing site!',
     actionLabel: 'View Slope Hazard',
     actionType: 'layer_slope',
     icon: TrendingUp,
-    color: '#F59E0B'
+    color: '#38BDF8'
   },
   {
     step: 4,

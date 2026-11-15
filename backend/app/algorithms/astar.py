@@ -10,7 +10,9 @@ class AStarPlanner:
         slope_grid: np.ndarray,
         res_meters: float = 20.0,
         max_slope_deg: float = 20.0,
-        climb_weight: float = 2.0
+        climb_weight: float = 2.0,
+        water_level: Optional[float] = None,
+        avoid_water: bool = False
     ):
         """
         A* pathfinder operating on Mars DEM and slope grids.
@@ -19,12 +21,15 @@ class AStarPlanner:
         :param res_meters: Grid resolution in meters per pixel (default 20.0m)
         :param max_slope_deg: Threshold above which terrain is impassable
         :param climb_weight: Penalty weight for uphill elevation gain
+        :param water_level: Simulated ancient Jezero paleolake water level in meters datum
+        :param avoid_water: When True, guides traversal strictly along dry ancient lake shoreline
         """
         self.elevation = elevation_grid
         self.slope = slope_grid
         self.res = res_meters
         self.max_slope = max_slope_deg
         self.climb_weight = climb_weight
+        self.water_level = water_level if (avoid_water and water_level is not None) else None
         self.height, self.width = elevation_grid.shape
 
         # 8-connected neighbor movements: (d_row, d_col, base_distance_meters)
@@ -134,6 +139,11 @@ class AStarPlanner:
                     elev_diff = next_elev - curr_elev
                     uphill_penalty = max(0.0, elev_diff) * self.climb_weight
                     step_cost = dist_step * (1.0 + slope_penalty) + uphill_penalty
+
+                    # Ancient paleolake flood water avoidance: steers pathfinder along dry shoreline
+                    if self.water_level is not None and next_elev <= self.water_level:
+                        water_depth = self.water_level - next_elev
+                        step_cost += dist_step * (120.0 + water_depth * 3.0)
                 tentative_g = current_g + step_cost
 
                 if tentative_g < g_scores.get(neighbor, float('inf')):

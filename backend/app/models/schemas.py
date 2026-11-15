@@ -47,6 +47,8 @@ class RouteRequest(BaseModel):
     start: PointCoordinates
     destination: PointCoordinates
     max_slope_deg: Optional[float] = Field(default=20.0, description="Maximum traversable slope threshold in degrees")
+    water_level: Optional[float] = Field(default=None, description="Ancient Jezero Lake elevation in meters datum")
+    avoid_water: Optional[bool] = Field(default=False, description="Whether to route strictly around lake shoreline on dry land")
 
 class RouteResponse(BaseModel):
     status: str

@@ -16,7 +16,8 @@ import {
   Tag,
   CheckCircle2,
   AlertTriangle,
-  Info
+  Info,
+  Waves
 } from 'lucide-react';
 import { calculateRoute } from '../../services/api';
 import { sfx } from '../../utils/audio';
@@ -116,7 +117,10 @@ export default function Terrain3DModal({
   startPoint: initialStartPoint,
   destinationPoint: initialDestPoint,
   onSelectWaypoint,
-  onRouteComputed
+  onRouteComputed,
+  waterLevel: initialWaterLevel = -2395,
+  isLakeActive: initialIsLakeActive = false,
+  onWaterLevelChange
 }) {
   const mountRef = useRef(null);
   const [exaggeration, setExaggeration] = useState(2.2);
@@ -128,6 +132,18 @@ export default function Terrain3DModal({
   const [isCalculating, setIsCalculating] = useState(false);
   const [selectedLandmark, setSelectedLandmark] = useState(null);
   const [feedbackNotice, setFeedbackNotice] = useState(null);
+
+  // Ancient Lake Jezero (~3.7 Ga) 3D Water Plane State
+  const [isLakeActive, setIsLakeActive] = useState(initialIsLakeActive);
+  const [waterLevel, setWaterLevel] = useState(initialWaterLevel);
+  const waterMeshRef = useRef(null);
+
+  useEffect(() => {
+    if (initialWaterLevel !== undefined) setWaterLevel(initialWaterLevel);
+  }, [initialWaterLevel]);
+  useEffect(() => {
+    if (initialIsLakeActive !== undefined) setIsLakeActive(initialIsLakeActive);
+  }, [initialIsLakeActive]);
 
   // Active route and waypoint state in 3D
   const [activeRoute, setActiveRoute] = useState(initialRouteData);
@@ -177,6 +193,19 @@ export default function Terrain3DModal({
   useEffect(() => {
     setDestPoint(initialDestPoint);
   }, [initialDestPoint]);
+
+  // Synchronize 3D paleolake water plane elevation & visibility
+  useEffect(() => {
+    if (waterMeshRef.current) {
+      if (!isLakeActive || waterLevel <= -2600) {
+        waterMeshRef.current.visible = false;
+      } else {
+        waterMeshRef.current.visible = true;
+        const normW = (waterLevel - JEZERO_BOUNDS.minElev) / (JEZERO_BOUNDS.maxElev - JEZERO_BOUNDS.minElev);
+        waterMeshRef.current.position.y = normW * 12.0 * exaggeration;
+      }
+    }
+  }, [waterLevel, isLakeActive, exaggeration]);
 
   // Sample exact terrain mesh height at any 3D X, Z coordinates directly from heightGrid
   const sampleTerrainHeightAtXZ = (x, z, heightGrid, exag = 2.2) => {
@@ -443,6 +472,25 @@ export default function Terrain3DModal({
       terrainMesh.castShadow = true;
       scene.add(terrainMesh);
       terrainMeshRef.current = terrainMesh;
+
+      // 3D Ancient Jezero Crater Paleolake Water Plane (~3.7 Ga)
+      const waterGeom = new THREE.PlaneGeometry(105, 105, 16, 16);
+      waterGeom.rotateX(-Math.PI / 2);
+      const waterMat = new THREE.MeshStandardMaterial({
+        color: 0x0ea5e9,
+        transparent: true,
+        opacity: 0.65,
+        roughness: 0.12,
+        metalness: 0.22,
+        depthWrite: false
+      });
+      const waterMesh = new THREE.Mesh(waterGeom, waterMat);
+      waterMesh.renderOrder = 8;
+      const initialNormW = (waterLevel - JEZERO_BOUNDS.minElev) / (JEZERO_BOUNDS.maxElev - JEZERO_BOUNDS.minElev);
+      waterMesh.position.y = initialNormW * 12.0 * exaggeration;
+      waterMesh.visible = isLakeActive && waterLevel > -2600;
+      scene.add(waterMesh);
+      waterMeshRef.current = waterMesh;
 
       // Render Staggered Landmarks & Active Waypoint Beacons
       renderLandmarks(scene, heightGrid, exaggeration, labelModeRef.current, selectedLandmarkRef.current);
@@ -808,6 +856,10 @@ export default function Terrain3DModal({
       if (activeRoute) render3DRoute(sceneRef.current, activeRoute, heightGrid, newExag);
       renderLandmarks(sceneRef.current, heightGrid, newExag, labelMode, selectedLandmark);
       updateWaypointBeacons(startPoint, destPoint, sceneRef.current, heightGrid, newExag);
+      if (waterMeshRef.current && isLakeActive && waterLevel > -2600) {
+        const normW = (waterLevel - JEZERO_BOUNDS.minElev) / (JEZERO_BOUNDS.maxElev - JEZERO_BOUNDS.minElev);
+        waterMeshRef.current.position.y = normW * 12.0 * newExag;
+      }
     }
   };
 
@@ -1167,6 +1219,74 @@ export default function Terrain3DModal({
                 <span>2.2x (Recommended)</span>
                 <span>4.0x (Peak)</span>
               </div>
+            </div>
+
+            {/* 3D Paleolake Water Level Control (~3.7 Ga) */}
+            <div className="bg-[#191b20]/95 backdrop-blur-md border border-sky-500/40 rounded-lg p-2 shadow-xl pointer-events-auto space-y-1.5 w-60">
+              <div className="flex justify-between items-center text-[10px]">
+                <button
+                  onClick={() => {
+                    const next = !isLakeActive;
+                    setIsLakeActive(next);
+                    sfx.playBlip();
+                  }}
+                  className={`flex items-center space-x-1 px-1.5 py-0.5 rounded border transition-colors ${
+                    isLakeActive 
+                      ? 'bg-sky-500/20 border-sky-400 text-sky-300 font-bold' 
+                      : 'bg-[#101114] border-[#33363D] text-[#A6A8AD] hover:text-white'
+                  }`}
+                >
+                  <Waves className="w-3 h-3 text-sky-400" />
+                  <span>Lake: {isLakeActive ? 'ON' : 'OFF'}</span>
+                </button>
+                <span className="text-white font-bold text-[10px]">
+                  {waterLevel <= -2600 ? 'Dry' : `${waterLevel} m`}
+                </span>
+              </div>
+
+              {isLakeActive && (
+                <div className="space-y-1 pt-1 border-t border-[#33363D]/60 animate-in fade-in duration-150">
+                  <input
+                    type="range"
+                    min="-2650"
+                    max="-2350"
+                    step="5"
+                    value={waterLevel}
+                    onChange={(e) => {
+                      const lvl = parseFloat(e.target.value);
+                      setWaterLevel(lvl);
+                      if (onWaterLevelChange) onWaterLevelChange(lvl);
+                    }}
+                    className="w-full accent-sky-400 h-1.5 bg-[#101114] rounded-lg cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[8px] text-[#A6A8AD]">
+                    <button 
+                      onClick={() => { setWaterLevel(-2650); if (onWaterLevelChange) onWaterLevelChange(-2650); sfx.playBlip(); }}
+                      className="hover:text-white"
+                    >
+                      Dry
+                    </button>
+                    <button 
+                      onClick={() => { setWaterLevel(-2530); if (onWaterLevelChange) onWaterLevelChange(-2530); sfx.playBlip(); }}
+                      className="hover:text-sky-300"
+                    >
+                      Low (-2530m)
+                    </button>
+                    <button 
+                      onClick={() => { setWaterLevel(-2395); if (onWaterLevelChange) onWaterLevelChange(-2395); sfx.playBlip(); }}
+                      className="text-sky-300 font-bold hover:underline"
+                    >
+                      Lake (-2395m)
+                    </button>
+                    <button 
+                      onClick={() => { setWaterLevel(-2350); if (onWaterLevelChange) onWaterLevelChange(-2350); sfx.playBlip(); }}
+                      className="hover:text-white"
+                    >
+                      Spillway
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

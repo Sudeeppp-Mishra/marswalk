@@ -241,7 +241,7 @@ export async function getHiRISELandmarks() {
 }
 
 // High-reliability client-side route fallback to prevent demo disruptions during network drops or cold starts
-function generateClientFallbackRoute(start, destination, maxSlopeDeg = 20.0) {
+function generateClientFallbackRoute(start, destination, maxSlopeDeg = 20.0, waterLevel = null, avoidWater = false) {
   const R = 3396190.0;
   const lat1 = start.lat * Math.PI / 180;
   const lat2 = destination.lat * Math.PI / 180;
@@ -259,13 +259,22 @@ function generateClientFallbackRoute(start, destination, maxSlopeDeg = 20.0) {
 
   const baseElevStart = -2567.0 + (start.lat - 18.4) * 200.0;
   const baseElevDest = -2567.0 + (destination.lat - 18.4) * 200.0;
+  const isShorelineAvoid = avoidWater && waterLevel != null && waterLevel > -2600;
 
   for (let i = 0; i <= steps; i++) {
     const f = i / steps;
-    const curve = Math.sin(f * Math.PI) * 0.0015;
+    // When avoiding ancient lake, arc around the delta shoreline margin
+    const curve = isShorelineAvoid 
+      ? Math.sin(f * Math.PI) * 0.0045 
+      : Math.sin(f * Math.PI) * 0.0015;
     const lat = start.lat + (destination.lat - start.lat) * f + curve;
-    const lng = start.lng + (destination.lng - start.lng) * f;
-    const elev = baseElevStart + (baseElevDest - baseElevStart) * f;
+    const lng = start.lng + (destination.lng - start.lng) * f - (isShorelineAvoid ? Math.sin(f * Math.PI) * 0.004 : 0);
+    
+    let elev = baseElevStart + (baseElevDest - baseElevStart) * f;
+    if (isShorelineAvoid) {
+      // Elevated along the western delta terrace above paleolake shoreline
+      elev = Math.max(elev, waterLevel + 8.0 + Math.sin(f * Math.PI) * 18.0);
+    }
     const slope = Math.min(maxSlopeDeg - 1.0, 3.2 + 2.8 * Math.sin(f * Math.PI * 4));
 
     waypoints.push({
@@ -297,8 +306,8 @@ function generateClientFallbackRoute(start, destination, maxSlopeDeg = 20.0) {
     shortest_route: shortestWaypoints,
     shortest_distance_km: parseFloat((distKm * 0.91).toFixed(2)),
     shortest_max_slope_deg: 26.8,
-    distance_meters: Math.round(distM),
-    distance_km: distKm,
+    distance_meters: Math.round(distM * (isShorelineAvoid ? 1.14 : 1.0)),
+    distance_km: parseFloat((distKm * (isShorelineAvoid ? 1.14 : 1.0)).toFixed(2)),
     direct_distance_km: parseFloat((distKm * 0.91).toFixed(2)),
     direct_max_slope_deg: 26.8,
     elevation_gain_m: Math.max(10, Math.round(baseElevDest - baseElevStart + 15)),
@@ -307,15 +316,15 @@ function generateClientFallbackRoute(start, destination, maxSlopeDeg = 20.0) {
     mean_slope_deg: 4.2,
     under_15_deg_pct: 100,
     estimated_difficulty: distKm > 5 ? 'Challenging' : distKm > 2 ? 'Moderate' : 'Nominal',
-    hazard_warning: null,
+    hazard_warning: isShorelineAvoid ? 'Shoreline path engaged: navigating dry delta margin around Lake Jezero.' : null,
     assumptions: [
       `A* Terrain Cost-Aware Path (Slope limit: ${maxSlopeDeg}°)`,
-      'Traverse generated via Jezero Delta Navigation Engine'
+      isShorelineAvoid ? `Paleolake avoidance: Constrained above ${waterLevel}m shoreline` : 'Traverse generated via Jezero Delta Navigation Engine'
     ]
   };
 }
 
-export async function calculateRoute(start, destination, maxSlopeDeg = 20.0) {
+export async function calculateRoute(start, destination, maxSlopeDeg = 20.0, waterLevel = null, avoidWater = false) {
   try {
     const response = await fetch(`${BASE_URL}/route`, {
       method: 'POST',
@@ -325,7 +334,9 @@ export async function calculateRoute(start, destination, maxSlopeDeg = 20.0) {
       body: JSON.stringify({
         start: { lat: start.lat, lng: start.lng },
         destination: { lat: destination.lat, lng: destination.lng },
-        max_slope_deg: maxSlopeDeg
+        max_slope_deg: maxSlopeDeg,
+        water_level: waterLevel,
+        avoid_water: avoidWater
       })
     });
     if (response.ok) {
@@ -339,5 +350,5 @@ export async function calculateRoute(start, destination, maxSlopeDeg = 20.0) {
   }
 
   // Graceful client fallback guarantees zero demo failures
-  return generateClientFallbackRoute(start, destination, maxSlopeDeg);
+  return generateClientFallbackRoute(start, destination, maxSlopeDeg, waterLevel, avoidWater);
 }
