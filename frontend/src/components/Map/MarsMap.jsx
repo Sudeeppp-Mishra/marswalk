@@ -54,6 +54,7 @@ import MapLegendBar from './MapLegendBar';
 import GeologyLegendBar from './GeologyLegendBar';
 import HiRISEInspectorModal from './HiRISEInspectorModal';
 import Terrain3DModal from './Terrain3DModal';
+import FirstTimeGuideModal from '../Common/FirstTimeGuideModal';
 
 const JEZERO_BOUNDS = [
   [18.2110274, 77.1604655],
@@ -268,6 +269,16 @@ export default function MarsMap({
   const [isMeasureMode, setIsMeasureMode] = useState(false);
   const [measurePoints, setMeasurePoints] = useState([]);
   const [showGuideModal, setShowGuideModal] = useState(false);
+
+  // Automatically display the 3-step walkthrough overlay for first-time judges
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('has_seen_marswalk_guide')) {
+        const timer = setTimeout(() => setShowGuideModal(true), 1200);
+        return () => clearTimeout(timer);
+      }
+    } catch (e) {}
+  }, []);
 
   const [geologyData, setGeologyData] = useState(DEFAULT_GEOLOGY_DATA);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -956,10 +967,11 @@ export default function MarsMap({
 
               <button
                 onClick={() => { setShowGuideModal(true); sfx.playBlip(); }}
-                title="Mission Quick Guide & Shortcuts (?)"
-                className="p-1 rounded text-[#A6A8AD] hover:text-sky-300 hover:bg-[#22252c] transition-colors"
+                title="Mission Quick Guide for Judges (1. Pick Preset, 2. Compute Route, 3. Export)"
+                className="px-2 py-1 rounded text-xs font-mono flex items-center space-x-1 bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-colors"
               >
-                <HelpCircle className="w-3.5 h-3.5" />
+                <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[10px] font-bold">Guide</span>
               </button>
 
               <button
@@ -1706,77 +1718,13 @@ export default function MarsMap({
         </div>
       )}
 
-      {/* Quick Mission Guide Modal */}
-      {showGuideModal && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#191b20] border border-[#33363D] rounded-xl max-w-lg w-full p-5 space-y-4 shadow-2xl font-mono">
-            <div className="flex items-center justify-between border-b border-[#33363D] pb-3">
-              <div className="flex items-center space-x-2">
-                <HelpCircle className="w-5 h-5 text-[#D97745]" />
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Astro-nah Mission Guide</h3>
-              </div>
-              <button
-                onClick={() => setShowGuideModal(false)}
-                className="text-[#A6A8AD] hover:text-white p-1 rounded hover:bg-[#22252c]"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs leading-relaxed">
-              <div className="p-3 rounded-lg bg-[#101114] border border-[#33363D] space-y-1">
-                <div className="flex items-center space-x-2 text-emerald-400 font-bold">
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-[10px]">STEP 1</span>
-                  <span>Select Route or Presets</span>
-                </div>
-                <p className="text-[#A6A8AD] text-[11px]">
-                  Pick one of 5 authentic Perseverance milestones (e.g., Landing Site → Kodiak Butte), or click any 2 points on the Jezero Delta.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-lg bg-[#101114] border border-[#33363D] space-y-1">
-                <div className="flex items-center space-x-2 text-[#D97745] font-bold">
-                  <span className="px-1.5 py-0.5 rounded bg-[#D97745]/20 text-[10px]">STEP 2</span>
-                  <span>Compare Rover vs Astronaut &amp; Safest vs Shortest</span>
-                </div>
-                <p className="text-[#A6A8AD] text-[11px]">
-                  Toggle Rover mode (15° limit) vs Astronaut mode (25° limit). Observe how A* navigates around &gt;20° scarps while the direct shortest path crosses dangerous drop-offs.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-lg bg-[#101114] border border-[#33363D] space-y-1">
-                <div className="flex items-center space-x-2 text-sky-400 font-bold">
-                  <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-[10px]">STEP 3</span>
-                  <span>Inspect 25cm Micro-Terrain &amp; Export</span>
-                </div>
-                <p className="text-[#A6A8AD] text-[11px]">
-                  Open the 25cm Lens to view boulders from the 9.1GB HiRISE GeoTIFF, simulate the traverse with live telemetry, and export GeoJSON/CSV.
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-[#33363D]">
-                <div className="text-[10px] text-[#A6A8AD] uppercase font-bold mb-1.5">Keyboard Shortcuts:</div>
-                <div className="grid grid-cols-2 gap-1 text-[10px] text-[#F3F3F3]">
-                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">Space</kbd> Play / Pause Sim</div>
-                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">R</kbd> Reset Waypoints</div>
-                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">D</kbd> Mission Dossier</div>
-                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">G</kbd> Tactical Grid</div>
-                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">V</kbd> 3D Terrain Orbit</div>
-                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">F</kbd> Fullscreen Ops</div>
-                  <div><kbd className="px-1 bg-[#22252c] rounded border border-[#33363D]">?</kbd> Open Guide</div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowGuideModal(false)}
-              className="w-full bg-[#D97745] hover:bg-[#B85C38] text-white py-2 rounded-lg font-bold text-xs transition-colors"
-            >
-              GOT IT — EXPLORE JEZERO
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Interactive 3-Step Walkthrough Guide for Hackathon Judges */}
+      <FirstTimeGuideModal
+        isOpen={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+        onApplyPreset={handleApplyPreset}
+        onComputeRoute={handleComputeRoute}
+      />
 
       {/* EVA Mission Dispatch Dossier Modal */}
       <MissionDossierModal
