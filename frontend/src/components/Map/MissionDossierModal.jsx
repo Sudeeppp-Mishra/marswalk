@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   Printer, 
@@ -11,11 +11,17 @@ import {
   AlertTriangle,
   Clock,
   BatteryCharging,
-  Download
+  Download,
+  QrCode,
+  Copy,
+  Check
 } from 'lucide-react';
 import { exportRouteAsGeoJSON, exportRouteAsCSV, exportMissionDossierReport } from '../../utils/exportRoute';
+import { sfx } from '../../utils/audio';
 
 export default function MissionDossierModal({ isOpen, onClose, routeData, startPoint, destinationPoint }) {
+  const [copied, setCopied] = useState(false);
+
   if (!isOpen || !routeData) return null;
 
   // Slope breakdown statistics
@@ -42,6 +48,18 @@ export default function MissionDossierModal({ isOpen, onClose, routeData, startP
   // Life support estimates (Apollo/Artemis EVA human factor guidelines)
   const estCalories = Math.round(estHours * 265);
   const estOxygenLiters = Math.round(estHours * 58);
+
+  const originLat = startPoint?.lat != null ? Number(startPoint.lat).toFixed(4) : '18.4447';
+  const originLng = startPoint?.lng != null ? Number(startPoint.lng).toFixed(4) : '77.4508';
+  const destLat = destinationPoint?.lat != null ? Number(destinationPoint.lat).toFixed(4) : '18.4231';
+  const destLng = destinationPoint?.lng != null ? Number(destinationPoint.lng).toFixed(4) : '77.4125';
+  const maxSlope = routeData?.max_slope_deg || 20;
+
+  const shareUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${window.location.pathname}?start=${originLat},${originLng}&dest=${destLat},${destLng}&slope=${maxSlope}`
+    : `https://astro-marswalk.vercel.app?start=${originLat},${originLng}&dest=${destLat},${destLng}&slope=${maxSlope}`;
+
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}&bgcolor=14161a&color=10b981&margin=1`;
 
   const handlePrint = () => {
     window.print();
@@ -81,13 +99,51 @@ export default function MissionDossierModal({ isOpen, onClose, routeData, startP
             <div>
               <span className="text-[10px] text-[#A6A8AD] uppercase">Traverse Origin</span>
               <div className="font-semibold text-emerald-400 mt-0.5">
-                {startPoint ? `${startPoint.lat}° N, ${startPoint.lng}° E` : 'Landing Site'}
+                {startPoint ? `${startPoint.lat}° N, ${startPoint.lng}° E` : 'Landing Site (18.4447° N, 77.4508° E)'}
               </div>
             </div>
             <div>
               <span className="text-[10px] text-[#A6A8AD] uppercase">Target Objective</span>
               <div className="font-semibold text-[#D97745] mt-0.5">
-                {destinationPoint ? `${destinationPoint.lat}° N, ${destinationPoint.lng}° E` : 'Kodiak Butte'}
+                {destinationPoint ? `${destinationPoint.lat}° N, ${destinationPoint.lng}° E` : 'Kodiak Butte (18.4231° N, 77.4125° E)'}
+              </div>
+            </div>
+          </div>
+
+          {/* Live Mobile QR Code & Dispatch Link */}
+          <div className="p-3 bg-[#14161a] rounded-lg border border-emerald-500/40 flex flex-col sm:flex-row items-center gap-3.5 shadow-lg shadow-emerald-950/20">
+            <div className="p-1.5 bg-[#101114] rounded-lg border border-[#33363D] flex-shrink-0">
+              <img 
+                src={qrCodeUrl} 
+                alt="Astro-nah Live Mission QR Code" 
+                className="w-24 h-24 rounded object-contain bg-[#14161a]"
+                loading="lazy"
+              />
+            </div>
+            <div className="space-y-1.5 text-center sm:text-left flex-1 min-w-0">
+              <div className="flex items-center justify-center sm:justify-start space-x-1.5 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                <QrCode className="w-3.5 h-3.5" />
+                <span>Live App Mission Dispatch QR</span>
+              </div>
+              <p className="text-[10px] text-[#A6A8AD] leading-relaxed">
+                Scan with any smartphone or tablet camera to instantly open this exact Jezero traverse in full 3D WebGL and 2D Leaflet without registration.
+              </p>
+              <div className="flex items-center justify-center sm:justify-start space-x-2 pt-0.5">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(shareUrl);
+                    setCopied(true);
+                    sfx.playSuccess();
+                    setTimeout(() => setCopied(false), 2500);
+                  }}
+                  className="px-2.5 py-1 rounded bg-[#22252c] hover:bg-[#2b2e36] text-white border border-[#33363D] text-[10px] font-bold flex items-center space-x-1 transition-colors"
+                >
+                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-sky-400" />}
+                  <span>{copied ? 'Copied URL!' : 'Copy Shareable URL'}</span>
+                </button>
+                <span className="text-[9px] text-[#777] truncate hidden md:inline">
+                  {shareUrl}
+                </span>
               </div>
             </div>
           </div>
@@ -172,6 +228,56 @@ export default function MissionDossierModal({ isOpen, onClose, routeData, startP
                 <span className="font-bold text-white">~{estOxygenLiters} Liters</span>
               </div>
             </div>
+          </div>
+
+          {/* Sol Operational Timeline & Sunset Deadline */}
+          <div className="p-3 bg-amber-950/20 rounded-lg border border-amber-500/40 space-y-2">
+            <div className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider flex items-center justify-between">
+              <div className="flex items-center space-x-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Sol Operational Timeline & Sunset Deadline</span>
+              </div>
+              <span className="text-[8.5px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-normal">
+                Approx. Jezero Equinox
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+              <div className="p-2 rounded bg-[#101114] border border-[#33363D]">
+                <span className="text-[#A6A8AD]">Nominal Departure:</span>
+                <div className="font-bold text-white text-xs mt-0.5">09:30 LMST</div>
+              </div>
+              <div className="p-2 rounded bg-[#101114] border border-[#33363D]">
+                <span className="text-[#A6A8AD]">Sunset Cutoff:</span>
+                <div className="font-bold text-amber-400 text-xs mt-0.5">17:45 LMST</div>
+              </div>
+              <div className="p-2 rounded bg-[#101114] border border-[#33363D]">
+                <span className="text-[#A6A8AD]">Est. Duration:</span>
+                <div className="font-bold text-sky-400 text-xs mt-0.5">{hrs}h {mins}m</div>
+              </div>
+              <div className="p-2 rounded bg-[#101114] border border-[#33363D]">
+                <span className="text-[#A6A8AD]">Daylight Margin:</span>
+                <div className="font-bold text-emerald-400 text-xs mt-0.5">
+                  ~{Math.max(0, 8.25 - estHours).toFixed(1)} hrs
+                </div>
+              </div>
+            </div>
+            <p className="text-[9.5px] text-[#C4C7CC] leading-relaxed">
+              * Operational Directive: Start at 09:30 Local Mean Solar Time (LMST) and return to the airlock before Jezero sunset (17:45 LMST, approx.). Post-sunset surface temperatures plunge to -85°C with zero solar power replenishment.
+            </p>
+          </div>
+
+          {/* Surface Gravimetry & Kinematics Fact */}
+          <div className="p-3 bg-[#14161a] rounded-lg border border-[#33363D] space-y-1.5">
+            <div className="text-[11px] font-semibold text-sky-400 uppercase tracking-wider flex items-center space-x-1.5">
+              <Activity className="w-3.5 h-3.5" />
+              <span>Martian Surface Gravity & Mobility Physics</span>
+            </div>
+            <div className="text-xs text-[#F3F3F3] font-bold">
+              Surface Gravity: 3.721 m/s² (38% of Earth's gravity / 0.379 g)
+            </div>
+            <p className="text-[10px] text-[#A6A8AD] leading-relaxed">
+              A 100 kg rover or suited astronaut weighs only 38 kg on Mars. While this 62% reduction in weight significantly reduces energetic consumption when climbing grades, it dramatically lowers ground normal force and wheel traction on loose Martian regolith, increasing slip hazards on slopes &gt;15°.
+            </p>
           </div>
 
           {/* Scientific Disclaimer Card */}

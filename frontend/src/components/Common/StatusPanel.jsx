@@ -369,6 +369,39 @@ export default function StatusPanel({
                 </div>
               </div>
 
+              {/* Sol Sunset Deadline Card */}
+              <div className="p-2 rounded bg-amber-950/20 border border-amber-500/30 text-[9.5px] font-mono space-y-1">
+                <div className="flex items-center justify-between font-bold text-amber-300">
+                  <span className="flex items-center space-x-1">
+                    <Clock className="w-3 h-3 text-amber-400" />
+                    <span>EVA Sol Solar Window</span>
+                  </span>
+                  <span className="text-[8px] px-1 rounded bg-amber-500/20 text-amber-200">APPROX</span>
+                </div>
+                <div className="flex justify-between text-[9px] text-[#F3F3F3]">
+                  <span className="text-[#A6A8AD]">Departure:</span>
+                  <span className="font-bold">09:30 LMST</span>
+                </div>
+                <div className="flex justify-between text-[9px] text-[#F3F3F3]">
+                  <span className="text-[#A6A8AD]">Sunset Deadline:</span>
+                  <span className="text-amber-400 font-bold">17:45 LMST</span>
+                </div>
+                <div className="text-[8px] text-[#A6A8AD] leading-tight pt-0.5 border-t border-amber-500/20">
+                  * Must return to base before Jezero sunset. Post-sunset surface temperatures plunge to -85°C with zero solar replenishment.
+                </div>
+              </div>
+
+              {/* Physical Gravimetry Fact */}
+              <div className="p-2 rounded bg-[#101114] border border-[#33363D] text-[9.5px] font-mono space-y-0.5">
+                <div className="flex items-center space-x-1 text-sky-300 font-bold">
+                  <Activity className="w-3 h-3 text-sky-400" />
+                  <span>Mars Gravity: 38% of Earth (3.72 m/s²)</span>
+                </div>
+                <p className="text-[8.5px] text-[#A6A8AD] leading-relaxed">
+                  A suited 140 kg astronaut weighs only ~53 kg on Mars. Reduced ground weight lowers traction, increasing wheel-spin risk on loose sandy inclines.
+                </p>
+              </div>
+
               {/* Quick Export Buttons */}
               <div className="flex space-x-1.5 pt-1 border-t border-[#33363D]">
                 <button
