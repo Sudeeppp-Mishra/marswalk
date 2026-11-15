@@ -9,13 +9,15 @@ app = FastAPI(
     version=PROJECT_VERSION,
 )
 
-# Enable CORS for frontend development
+# Enable CORS for all frontends (Safari, Chrome, Vercel, Localhost)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 # Include API endpoints under /api
