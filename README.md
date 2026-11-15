@@ -2,7 +2,12 @@
 
 > **Martian Surface Exploration and Autonomous Navigation Platform**  
 > *NASA Space Apps Challenge 2026*  
-> Primary Mission Target: **Jezero Crater Delta, Mars** ($18.38^\circ\text{N}, 77.58^\circ\text{E}$)
+> Primary Mission Target: **Jezero Crater Delta, Mars** ($18.38^\circ\text{N}, 77.58^\circ\text{E}$)  
+> 🌐 **Live Deployment:** [https://astro-marswalk.vercel.app](https://astro-marswalk.vercel.app)
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-astro--marswalk.vercel.app-10B981?style=for-the-badge&logo=vercel&logoColor=white)](https://astro-marswalk.vercel.app)
+[![NASA Space Apps](https://img.shields.io/badge/NASA%20Space%20Apps-2026-D97745?style=for-the-badge)](https://www.spaceappschallenge.org/)
+[![Target](https://img.shields.io/badge/Target-Jezero%20Crater%20Delta-38BDF8?style=for-the-badge)](https://mars.nasa.gov/mars2020/)
 
 Astro-nah is a full-stack planetary surface exploration and navigation platform designed for the NASA Space Apps Challenge 2026. It transforms authentic NASA and USGS orbital datasets into an intelligent, slope-cost-aware navigation system for robotic rovers and future astronaut Extravehicular Activities (EVA) within Jezero Crater.
 
@@ -70,7 +75,15 @@ Astro-nah is a full-stack planetary surface exploration and navigation platform 
 
 ## 🚀 Running the Project
 
-### Prerequisites
+### 🌐 Live Web Application
+Access the production deployment immediately without any local setup:  
+👉 **[https://astro-marswalk.vercel.app](https://astro-marswalk.vercel.app)**
+
+---
+
+### Local Development Setup
+
+#### Prerequisites
 - Node.js 18+ and npm
 - Python 3.10+
 
